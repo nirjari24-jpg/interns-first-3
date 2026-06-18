@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #000000;
+  --foreground: #f8fafc;
 }
 
 @theme inline {
@@ -19,6 +19,33 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+/* Floating Ambient Orbs Keyframe Animations */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-25px) scale(1.05);
+  }
+}
+
+@keyframes float-medium {
+  0%, 100% {
+    transform: translateY(0px) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translateY(20px) scale(0.95) rotate(180deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 15s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: float-medium 20s ease-in-out infinite;
 }
 
 /* Custom Keyframe Animations for iOS Feel */
@@ -63,6 +90,13 @@ body {
   animation: fadeIn 0.25s ease-out forwards;
 }
 
+/* Frosted Glassmorphism Styles (True Black AMOLED Optimization) */
+.glass-card-dark {
+  background: rgba(10, 10, 12, 0.65);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Custom scrollbar utility */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
@@ -82,31 +116,20 @@ body {
   background: rgba(255, 255, 255, 0.25);
 }
 
-/* Force dark black text color inside light theme */
-.light-theme,
-.light-theme * {
-  color: #000000 !important;
+/* Online Status Pulse */
+.pulse-online {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  animation: pulse-green 2s infinite;
 }
 
-/* Ensure placeholder texts are solid black with subtle opacity */
-.light-theme input::placeholder,
-.light-theme textarea::placeholder {
-  color: #000000 !important;
-  opacity: 0.55 !important;
+@keyframes pulse-green {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
-
-/* Ensure active/accent state colors are preserved by overriding general color rules */
-.light-theme .text-cyan-400 { color: #22d3ee !important; }
-.light-theme .text-cyan-500 { color: #06b6d4 !important; }
-.light-theme .text-emerald-400 { color: #34d399 !important; }
-.light-theme .text-emerald-500 { color: #10b981 !important; }
-.light-theme .text-rose-400 { color: #fb7185 !important; }
-.light-theme .text-rose-500 { color: #f43f5e !important; }
-.light-theme .text-amber-400 { color: #fbbf24 !important; }
-.light-theme .text-amber-500 { color: #f59e0b !important; }
-.light-theme .text-indigo-400 { color: #818cf8 !important; }
-.light-theme .text-indigo-500 { color: #6366f1 !important; }
-.light-theme .text-indigo-600 { color: #4f46e5 !important; }
-.light-theme .text-indigo-400 * { color: #818cf8 !important; }
-.light-theme .text-cyan-400 * { color: #22d3ee !important; }
-.light-theme .text-emerald-400 * { color: #34d399 !important; }
