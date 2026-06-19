@@ -11,3 +11,7 @@ node_modules/
 
 # VS Code settings that shouldn't be shared
 .vscode/
+
+# Local persistent MongoDB memory server directory
+backend/db_persist/
+

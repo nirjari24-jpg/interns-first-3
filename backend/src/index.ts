@@ -9,6 +9,8 @@ import User, { IUser } from './models/User';
 import Message, { IMessage } from './models/Message';
 import MessageRequest, { IMessageRequest } from './models/MessageRequest';
 import { MongoMemoryServer } from 'mongodb-memory-server';
+import fs from 'fs';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
@@ -149,33 +151,69 @@ const seedDatabase = async () => {
   }
 };
 
+let mongoMemoryInstance: MongoMemoryServer | null = null;
+
 // Database Connection
 const connectDB = async () => {
   const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/chatgroup';
   
   try {
     console.log(`Connecting to MongoDB at: ${dbUri}`);
-    await mongoose.connect(dbUri);
+    await mongoose.connect(dbUri, { serverSelectionTimeoutMS: 2000 });
     console.log('Connected to MongoDB Atlas / Database');
     await seedDatabase();
   } catch (err: any) {
     console.warn('MongoDB connection error:', err.message);
-    console.log('Attempting to start an in-memory MongoDB server as fallback...');
+    console.log('Attempting to start a persistent in-memory MongoDB server as fallback...');
     
     try {
-      const mongoMemoryServer = await MongoMemoryServer.create();
-      const inMemoryUri = mongoMemoryServer.getUri();
-      console.log(`Starting in-memory MongoDB server at: ${inMemoryUri}`);
+      const dbPersistPath = path.join(__dirname, '../db_persist');
+      if (!fs.existsSync(dbPersistPath)) {
+        fs.mkdirSync(dbPersistPath, { recursive: true });
+      }
+      
+      mongoMemoryInstance = await MongoMemoryServer.create({
+        instance: {
+          dbPath: dbPersistPath,
+          storageEngine: 'wiredTiger'
+        }
+      });
+      const inMemoryUri = mongoMemoryInstance.getUri();
+      console.log(`Starting persistent MongoDB server at: ${inMemoryUri} with dbPath: ${dbPersistPath}`);
       await mongoose.connect(inMemoryUri);
-      console.log('Connected to In-Memory MongoDB Database!');
+      console.log('Connected to Persistent MongoMemoryServer Database!');
       await seedDatabase();
     } catch (memErr: any) {
-      console.error('Failed to start in-memory MongoDB fallback server:', memErr.message);
+      console.error('Failed to start persistent MongoDB fallback server:', memErr.message);
+      console.log('Falling back to volatile ephemeral MongoMemoryServer...');
+      try {
+        mongoMemoryInstance = await MongoMemoryServer.create();
+        const inMemoryUri = mongoMemoryInstance.getUri();
+        await mongoose.connect(inMemoryUri);
+        console.log('Connected to Volatile Ephemeral MongoDB Database!');
+        await seedDatabase();
+      } catch (ephErr: any) {
+        console.error('Critical: Failed to start any MongoDB server:', ephErr.message);
+      }
     }
   }
 };
 
 connectDB();
+
+// Handle graceful shutdown to release database locks
+// Triggering restart to test persistent DB fallback
+const cleanup = async () => {
+  console.log('Cleaning up database connections...');
+  if (mongoMemoryInstance) {
+    await mongoMemoryInstance.stop();
+  }
+  await mongoose.disconnect();
+  process.exit(0);
+};
+
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 
 // Socket.io Real-time Logic
 io.on('connection', (socket) => {
