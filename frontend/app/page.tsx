@@ -160,7 +160,8 @@ export default function Home() {
   const [currentView, setCurrentView] = useState("chat"); // "chat" or "settings"
 
   // Settings Theme
-  const [theme, setTheme] = useState("dark"); // "dark" or "light"
+  const [theme, setTheme] = useState<"light" | "dark" | "black">("dark"); // "dark", "light", or "black"
+  const isDark = theme === "dark" || theme === "black";
 
   // Account Detail States
   const [name, setName] = useState("Om Gadhiya");
@@ -799,6 +800,10 @@ export default function Home() {
 
   // 1. Initial Load from Local Cache
   useEffect(() => {
+    const savedTheme = localStorage.getItem("chatgroup_theme") as "light" | "dark" | "black" | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+    }
     const savedUser = localStorage.getItem("chatgroup_current_user");
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
@@ -829,6 +834,11 @@ export default function Home() {
     fetchRequests();
     setActiveContact(MOCK_CONTACTS[0]);
   }, [API_BASE]);
+
+  // Save theme changes to Local Cache
+  useEffect(() => {
+    localStorage.setItem("chatgroup_theme", theme);
+  }, [theme]);
 
   // Poll users periodically
   useEffect(() => {
@@ -1559,7 +1569,10 @@ export default function Home() {
   if (currentView === "settings") {
     return (
       <main className={`min-h-screen w-full transition-colors duration-500 flex flex-col justify-start items-center p-4 sm:p-6 md:p-12 font-sans relative overflow-y-auto ${
-        theme === "dark" ? "bg-black text-[#E4E6EB]" : "bg-slate-50 text-slate-800"
+        theme === "black" 
+          ? "bg-black text-[#E4E6EB] black-theme" 
+          : isDark ? "bg-[#04060A] text-[#E4E6EB]" 
+            : "bg-slate-50 text-black light-theme"
       }`}>
         
         {/* Hidden File Input for Avatar Upload */}
@@ -1574,10 +1587,10 @@ export default function Home() {
         {/* Background glowing particles (Aurora effect) */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className={`absolute top-[5%] left-[10%] w-[380px] h-[380px] rounded-full blur-[120px] transition-opacity duration-700 ${
-            theme === "dark" ? "bg-cyan-500/10 opacity-100" : "bg-cyan-400/5 opacity-80"
+            isDark ? "bg-cyan-500/10 opacity-100" : "bg-cyan-400/5 opacity-80"
           }`} />
           <div className={`absolute bottom-[10%] right-[10%] w-[450px] h-[450px] rounded-full blur-[140px] transition-opacity duration-700 ${
-            theme === "dark" ? "bg-purple-500/10 opacity-100" : "bg-purple-400/5 opacity-80"
+            isDark ? "bg-purple-500/10 opacity-100" : "bg-purple-400/5 opacity-80"
           }`} />
         </div>
 
@@ -1593,8 +1606,7 @@ export default function Home() {
           
           {/* Top Header Panel */}
           <div className={`relative border rounded-3xl p-5 md:p-6 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden transition-colors duration-500 ${
-            theme === "dark" 
-              ? "bg-gradient-to-r from-black via-[#08080C] to-black border-slate-900" 
+            isDark ? "bg-gradient-to-r from-black via-[#08080C] to-black border-slate-900" 
               : "bg-white border-slate-200"
           }`}>
             
@@ -1606,8 +1618,7 @@ export default function Home() {
               <button
                 onClick={() => setCurrentView("chat")}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  theme === "dark"
-                    ? "bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800"
+                  isDark ? "bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800"
                     : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
                 }`}
                 title="Back to ChatRoom"
@@ -1624,7 +1635,7 @@ export default function Home() {
                     Settings Dashboard
                   </span>
                 </h1>
-                <p className={`text-xs mt-1 ${theme === "dark" ? "text-slate-400" : "text-black font-semibold"}`}>
+                <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-black font-semibold"}`}>
                   Customize account profile details and manage credentials.
                 </p>
               </div>
@@ -1633,22 +1644,32 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => {
-                  setTheme(theme === "dark" ? "light" : "dark");
-                  setToast(theme === "dark" ? "Light Theme Activated ☀️" : "Dark Theme Activated 🌙");
-                  setTimeout(() => setToast(null), 2500);
+                  setTheme(prev => {
+                    const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
+                    setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
+                    setTimeout(() => setToast(null), 2500);
+                    return next;
+                  });
                 }}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  theme === "dark"
-                    ? "bg-black border-slate-900 text-yellow-400 hover:bg-[#0A0A0C] hover:border-yellow-500"
-                    : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 hover:border-slate-300 shadow-sm"
+                  theme === "black"
+                    ? "bg-[#121212] border-neutral-900 text-amber-400 hover:bg-neutral-900"
+                    : isDark ? "bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-850"
+                      : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
                 }`}
-                title="Toggle Theme"
+                title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
               >
-                {theme === "dark" ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+                {theme === "black" ? (
+                  <Sun className="w-4.5 h-4.5" />
+                ) : isDark ? (
+                  <Sparkles className="w-4.5 h-4.5" />
+                ) : (
+                  <Moon className="w-4.5 h-4.5" />
+                )}
               </button>
 
               <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border select-none ${
-                theme === "dark" ? "bg-slate-900/50 border-slate-800/60" : "bg-white border-slate-200 shadow-sm"
+                isDark ? "bg-slate-900/50 border-slate-800/60" : "bg-white border-slate-200 shadow-sm"
               }`}>
                 <Clock className="w-4 h-4 text-cyan-400" />
                 <span className="text-xs font-bold">{timeString || "12:37"}</span>
@@ -1662,9 +1683,9 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="hidden lg:block lg:col-span-4 space-y-6">
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 ${
-                theme === "dark" ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
-                <h3 className={`text-xs font-extrabold uppercase tracking-wider mb-4 px-1.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Settings Hub</h3>
+                <h3 className={`text-xs font-extrabold uppercase tracking-wider mb-4 px-1.5 ${isDark ? "text-slate-400" : "text-black"}`}>Settings Hub</h3>
                 
                 <div className="space-y-1.5">
                   <button
@@ -1694,13 +1715,13 @@ export default function Home() {
               </div>
 
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                theme === "dark" ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
 
                 <div className="flex items-center gap-2 mb-4">
                   <Award className="w-5 h-5 text-cyan-400" />
-                  <h3 className={`text-xs font-extrabold uppercase tracking-wider ${theme === "dark" ? "text-slate-350" : "text-black"}`}>Security Health</h3>
+                  <h3 className={`text-xs font-extrabold uppercase tracking-wider ${isDark ? "text-slate-350" : "text-black"}`}>Security Health</h3>
                 </div>
 
                 <div className="flex items-center gap-4">
@@ -1713,7 +1734,7 @@ export default function Home() {
                     <h4 className="text-xs.5 font-bold tracking-wide">
                       {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
                     </h4>
-                    <p className={`text-[10px] leading-normal ${theme === "dark" ? "text-slate-400" : "text-black"}`}>
+                    <p className={`text-[10px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
                       {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
                     </p>
                   </div>
@@ -1746,8 +1767,7 @@ export default function Home() {
 
             <div className="lg:col-span-8 w-full space-y-4">
               <div className={`flex lg:hidden gap-1.5 p-1.5 rounded-2xl border transition-colors duration-500 ${
-                theme === "dark" 
-                  ? "bg-slate-950/40 border-slate-800/80" 
+                isDark ? "bg-slate-950/40 border-slate-800/80" 
                   : "bg-white border-slate-200 shadow-sm"
               }`}>
                 <button
@@ -1755,10 +1775,9 @@ export default function Home() {
                   onClick={() => setActiveSection("profile")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "profile"
-                      ? theme === "dark"
-                        ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
+                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
                         : "bg-cyan-50 text-cyan-600 border border-cyan-200"
-                      : theme === "dark" ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
+                      : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
                 >
                   <UserIcon className="w-4 h-4" />
@@ -1770,10 +1789,9 @@ export default function Home() {
                   onClick={() => setActiveSection("security")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "security"
-                      ? theme === "dark"
-                        ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
+                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
                         : "bg-cyan-50 text-cyan-600 border border-cyan-200"
-                      : theme === "dark" ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
+                      : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
                 >
                   <Lock className="w-4 h-4" />
@@ -1783,7 +1801,7 @@ export default function Home() {
               
               {activeSection === "profile" && (
                 <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  theme === "dark" ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
                 }`}>
                   <form onSubmit={handleSaveProfile} className="space-y-6">
                     <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
@@ -1795,7 +1813,7 @@ export default function Home() {
                     </div>
 
                     <div className={`flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl border select-none transition-colors duration-500 ${
-                      theme === "dark" ? "bg-slate-950/40 border-slate-900/60" : "bg-slate-50 border-slate-200"
+                      isDark ? "bg-slate-950/40 border-slate-900/60" : "bg-slate-50 border-slate-200"
                     }`}>
                       <div className="relative group">
                         <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
@@ -1819,7 +1837,7 @@ export default function Home() {
 
                       <div className="text-center sm:text-left space-y-1">
                         <h3 className="text-sm.5 font-extrabold">{name}</h3>
-                        <p className={`text-[11px] leading-normal ${theme === "dark" ? "text-slate-400" : "text-black"}`}>
+                        <p className={`text-[11px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
                           JPG, PNG allowed. Standard resolution will be automatically configured.
                         </p>
                         
@@ -1838,14 +1856,13 @@ export default function Home() {
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2 text-left">
-                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Full Name</label>
+                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Full Name</label>
                           <input
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your full name..."
@@ -1854,14 +1871,13 @@ export default function Home() {
                         </div>
 
                         <div className="space-y-2 text-left">
-                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Username</label>
+                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Username</label>
                           <input
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your username..."
@@ -1871,7 +1887,7 @@ export default function Home() {
                       </div>
 
                       <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Email Address</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Email Address</label>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
                             <Mail className="w-4 h-4" />
@@ -1881,8 +1897,7 @@ export default function Home() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="your.email@domain.com"
@@ -1892,7 +1907,7 @@ export default function Home() {
                       </div>
 
                       <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Phone Number</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Phone Number</label>
                         <div className="relative">
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
                             <Phone className="w-4 h-4" />
@@ -1902,8 +1917,7 @@ export default function Home() {
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
                             className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your phone number..."
@@ -1913,14 +1927,13 @@ export default function Home() {
                       </div>
 
                       <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Bio Details</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Bio Details</label>
                         <textarea
                           rows={3}
                           value={bio}
                           onChange={(e) => setBio(e.target.value)}
                           className={`w-full border rounded-2xl p-4.5 text-xs.5 outline-none transition duration-300 resize-none ${
-                            theme === "dark" 
-                              ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                            isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                               : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                           }`}
                           placeholder="Write something about yourself..."
@@ -1940,7 +1953,7 @@ export default function Home() {
 
               {activeSection === "security" && (
                 <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  theme === "dark" ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
                 }`}>
                   <form onSubmit={handleSavePassword} className="space-y-6">
                     <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
@@ -1953,15 +1966,14 @@ export default function Home() {
 
                     <div className="space-y-4">
                       <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Current Password</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Current Password</label>
                         <div className="relative">
                           <input
                             type={showCurrentPassword ? "text" : "password"}
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Type current password..."
@@ -1978,15 +1990,14 @@ export default function Home() {
                       </div>
 
                       <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>New Password</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>New Password</label>
                         <div className="relative">
                           <input
                             type={showNewPassword ? "text" : "password"}
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Type new secure password..."
@@ -2042,15 +2053,14 @@ export default function Home() {
                       </div>
 
                       <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${theme === "dark" ? "text-slate-400" : "text-black"}`}>Confirm New Password</label>
+                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Confirm New Password</label>
                         <div className="relative">
                           <input
                             type={showConfirmPassword ? "text" : "password"}
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              theme === "dark" 
-                                ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Verify new secure password..."
@@ -2078,7 +2088,7 @@ export default function Home() {
               )}
 
               <div className={`block lg:hidden border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                theme === "dark" ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
 
@@ -2140,12 +2150,17 @@ export default function Home() {
   // --- DEFAULT VIEW: CHATROOM ---
   return (
     <div className={`w-full h-screen max-h-screen text-slate-800 flex flex-col font-sans antialiased overflow-hidden ${
-      theme === "dark" ? "bg-slate-950 text-slate-100" : "bg-white text-slate-800"
+      theme === "black" 
+        ? "bg-black text-slate-100 black-theme" 
+        : isDark ? "bg-slate-950 text-slate-100" 
+          : "bg-white text-slate-800"
     }`}>
       
       {/* 1. TOP CHATGROUP NAVBAR */}
       <header className={`h-[60px] border-b px-6 flex items-center justify-between z-50 flex-shrink-0 backdrop-blur-md ${
-        theme === "dark" ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
+        theme === "black"
+          ? "bg-black border-neutral-900"
+          : isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
       }`}>
         
         {/* Left Branding */}
@@ -2160,7 +2175,9 @@ export default function Home() {
 
         {/* Center Search bar */}
         <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-          theme === "dark" ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
+          theme === "black"
+            ? "bg-[#0a0a0a] border-neutral-900"
+            : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
         }`}>
           <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
@@ -2193,16 +2210,26 @@ export default function Home() {
 
           {/* Theme Toggle Button */}
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={() => {
+              setTheme(prev => {
+                const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
+                setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
+                setTimeout(() => setToast(null), 2500);
+                return next;
+              });
+            }}
             className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
-              theme === "dark" 
-                ? "bg-slate-900 border-slate-800 text-yellow-400 hover:bg-slate-850 hover:text-yellow-300 shadow-md shadow-yellow-500/5" 
-                : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 shadow-sm"
+              theme === "black"
+                ? "bg-[#121212] border-neutral-900 text-yellow-400 hover:bg-neutral-900 shadow-md"
+                : isDark ? "bg-slate-900 border-slate-800 text-yellow-400 hover:bg-slate-850 hover:text-yellow-300 shadow-md shadow-yellow-500/5" 
+                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 shadow-sm"
             }`}
-            title={theme === "dark" ? "Switch to Light Theme" : "Switch to Dark Theme"}
+            title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
           >
-            {theme === "dark" ? (
+            {theme === "black" ? (
               <Sun className="w-4 h-4 text-yellow-400" />
+            ) : isDark ? (
+              <Sparkles className="w-4.5 h-4.5" />
             ) : (
               <Moon className="w-4 h-4 text-slate-650" />
             )}
@@ -2272,20 +2299,24 @@ export default function Home() {
       {/* 2. AUTH / LOGOUT / REGISTER CONTAINER */}
       {!currentUser ? (
         <div className={`flex-1 flex items-center justify-center p-6 relative overflow-hidden ${
-          "bg-[#000000]"
+          theme === "black"
+            ? "bg-black black-theme"
+            : isDark ? "bg-slate-950" : "bg-slate-50"
         }`}>
           {/* Floating background glowing orbs */}
           <div className="absolute inset-0 pointer-events-none z-0">
             <div className={`absolute top-[10%] left-[15%] w-[250px] sm:w-[320px] h-[250px] sm:h-[320px] rounded-full blur-[100px] transition-opacity duration-700 animate-float-slow ${
-              theme === "dark" ? "bg-indigo-600/15 opacity-100" : "bg-indigo-400/10 opacity-80"
+              isDark ? "bg-indigo-600/15 opacity-100" : "bg-indigo-400/10 opacity-80"
             }`} />
             <div className={`absolute bottom-[10%] right-[15%] w-[280px] sm:w-[350px] h-[280px] sm:h-[350px] rounded-full blur-[110px] transition-opacity duration-700 animate-float-medium ${
-              theme === "dark" ? "bg-sky-500/15 opacity-100" : "bg-sky-400/10 opacity-80"
+              isDark ? "bg-sky-500/15 opacity-100" : "bg-sky-400/10 opacity-80"
             }`} />
           </div>
 
           <div className={`w-full max-w-[420px] rounded-[32px] p-8 shadow-[0_24px_60px_rgba(0,0,0,0.15)] flex flex-col items-center animate-chat-bubble border relative z-10 ${
-            theme === "dark" ? "glass-card-dark" : "glass-card-light"
+            theme === "black"
+              ? "bg-[#050505] border-neutral-900 text-slate-100 black-theme"
+              : isDark ? "glass-card-dark text-slate-100" : "glass-card-light text-slate-800"
           }`}>
             <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-sky-500/40 to-transparent" />
             
@@ -2295,7 +2326,7 @@ export default function Home() {
               </svg>
             </div>
 
-            <h2 className={`text-2xl font-black tracking-wide mb-1 ${theme === "dark" ? "text-slate-100" : "text-slate-800"}`}>
+            <h2 className={`text-2xl font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
               {authMode === "login" ? "Welcome Back" : "Create Account"}
             </h2>
             <p className="text-[12px] text-slate-400 text-center mb-6 leading-relaxed">
@@ -2324,8 +2355,7 @@ export default function Home() {
                     onChange={(e) => setAuthEmail(e.target.value)}
                     placeholder="e.g. paul or paul@chatgroup.com"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      theme === "dark" 
-                        ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
@@ -2340,8 +2370,7 @@ export default function Home() {
                     onChange={(e) => setAuthPassword(e.target.value)}
                     placeholder="••••••••"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      theme === "dark" 
-                        ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
@@ -2401,8 +2430,7 @@ export default function Home() {
                     onChange={(e) => setRegUsername(e.target.value)}
                     placeholder="e.g. Ann"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      theme === "dark" 
-                        ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
@@ -2417,8 +2445,7 @@ export default function Home() {
                     onChange={(e) => setRegEmail(e.target.value)}
                     placeholder="e.g. ann@example.com"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      theme === "dark" 
-                        ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
@@ -2433,8 +2460,7 @@ export default function Home() {
                     onChange={(e) => setRegPassword(e.target.value)}
                     placeholder="Create a password"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      theme === "dark" 
-                        ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
@@ -2512,7 +2538,7 @@ export default function Home() {
           {/* COLUMN 1: LEFT SIDEBAR MESSAGES LIST (350px) */}
           <section 
             className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 ${
-              theme === "dark" ? "bg-black border-slate-900" : "bg-white border-slate-200"
+              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
             } ${
               activeContact 
                 ? "hidden md:flex w-[350px] h-full" 
@@ -2521,7 +2547,7 @@ export default function Home() {
           >
             <div className="p-4 flex flex-col gap-3 border-b border-slate-100/10">
               <div className={`w-full h-[36px] border rounded-lg flex items-center px-3 gap-2 ${
-                theme === "dark" ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-200"
+                isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-200"
               }`}>
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
@@ -2575,28 +2601,26 @@ export default function Home() {
                       onClick={() => setActiveContact(user)}
                       className={`w-full p-3 flex items-center gap-3.5 rounded-2xl relative transition-all duration-300 hover:translate-x-1 ${
                         isActive
-                          ? theme === "dark" 
-                            ? "bg-slate-800/80 border border-slate-700/50 shadow-md shadow-black/10" 
+                          ? isDark ? "bg-slate-800/80 border border-slate-700/50 shadow-md shadow-black/10" 
                             : "bg-slate-100 border border-slate-200/80 shadow-sm"
-                          : theme === "dark" 
-                            ? "border border-transparent hover:bg-slate-900/40 hover:border-slate-850/50" 
+                          : isDark ? "border border-transparent hover:bg-slate-900/40 hover:border-slate-850/50" 
                             : "border border-transparent hover:bg-slate-50/80 hover:border-slate-100"
                       }`}
                     >
                       <div className="relative flex-shrink-0">
                         <div className={`w-[52px] h-[52px] rounded-full overflow-hidden p-[2.5px] ${
-                          isActive ? "insta-gradient-border" : theme === "dark" ? "border border-slate-800" : "border border-slate-200"
+                          isActive ? "insta-gradient-border" : isDark ? "border border-slate-800" : "border border-slate-200"
                         }`}>
                           <img 
                             src={user.avatarUrl} 
                             className={`w-full h-full rounded-full object-cover border ${
-                              theme === "dark" ? "border-slate-900" : "border-white"
+                              isDark ? "border-slate-900" : "border-white"
                             }`} 
                           />
                         </div>
                         
                         <span className={`absolute top-0.5 right-0.5 w-3 h-3 rounded-full border-2 ${
-                          theme === "dark" ? "border-slate-900" : "border-white"
+                          isDark ? "border-slate-900" : "border-white"
                         } ${
                           isTyping ? "bg-amber-400 animate-pulse" :
                           isOnline ? "bg-emerald-500 pulse-online" :
@@ -2607,7 +2631,7 @@ export default function Home() {
                       <div className="flex-1 text-left min-w-0">
                         <div className="flex justify-between items-center mb-0.5">
                           <span className={`text-[13.5px] font-bold tracking-wide truncate ${
-                            theme === "dark" ? "text-slate-200" : "text-slate-700"
+                            isDark ? "text-slate-200" : "text-slate-700"
                           }`}>
                             {user.username.toUpperCase()}
                           </span>
@@ -2654,7 +2678,7 @@ export default function Home() {
           {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM */}
           <main 
             className={`flex-1 flex flex-col border-r transition-all duration-300 ${
-              theme === "dark" ? "bg-black border-slate-900" : "bg-white border-slate-200"
+              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
             } ${
               !activeContact 
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
@@ -2665,7 +2689,7 @@ export default function Home() {
               <>
                 {/* Active Chat Header */}
                 <header className={`h-[60px] px-6 border-b flex items-center justify-between flex-shrink-0 z-40 select-none backdrop-blur-md ${
-                  theme === "dark" ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
+                  isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
                 }`}>
                   <div className="flex items-center gap-3">
                     <button 
@@ -2690,7 +2714,7 @@ export default function Home() {
                       }`} />
                     </div>
                     <div>
-                      <h3 className={`text-sm font-bold tracking-wide ${theme === "dark" ? "text-slate-100" : "text-slate-800"}`}>{activeContact.username}</h3>
+                      <h3 className={`text-sm font-bold tracking-wide ${isDark ? "text-slate-100" : "text-slate-800"}`}>{activeContact.username}</h3>
                       <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
                         {typingUsers[activeContact.username] ? "typing..." : "Active now"}
                       </p>
@@ -2739,7 +2763,7 @@ export default function Home() {
 
                 {/* Message feeds stream */}
                 <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-5 custom-scrollbar flex flex-col ${
-                  theme === "dark" ? "bg-black" : "bg-white"
+                  isDark ? "bg-black" : "bg-white"
                 }`}>
                   
                   {/* Sync info banner */}
@@ -2777,8 +2801,7 @@ export default function Home() {
                             className={`px-4 py-2.5 rounded-[20px] text-[14px] leading-relaxed shadow-md break-words relative transition-all ${
                               isMe
                                 ? "bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white rounded-br-xs shadow-blue-500/10 border border-blue-500/20"
-                                : theme === "dark" 
-                                  ? "bg-slate-900/90 text-slate-100 rounded-bl-xs border border-slate-800/80 shadow-black/10"
+                                : isDark ? "bg-slate-900/90 text-slate-100 rounded-bl-xs border border-slate-800/80 shadow-black/10"
                                   : "bg-slate-100/90 text-slate-800 rounded-bl-xs border border-slate-200/50 shadow-slate-100/50"
                             }`}
                           >
@@ -2819,7 +2842,7 @@ export default function Home() {
                         className="w-[28px] h-[28px] rounded-full object-cover border border-slate-200 flex-shrink-0 mb-1"
                       />
                       <div className={`px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-sm ${
-                        theme === "dark" ? "bg-slate-800 text-slate-100" : "bg-slate-100 text-slate-800"
+                        isDark ? "bg-slate-800 text-slate-100" : "bg-slate-100 text-slate-800"
                       }`}>
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-450 animate-bounce" style={{ animationDelay: "0ms" }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-slate-450 animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -2835,8 +2858,7 @@ export default function Home() {
                 {isAccepted ? (
                   <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
                     <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg ${
-                      theme === "dark" 
-                        ? "bg-slate-905/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
+                      isDark ? "bg-slate-905/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
                         : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
                     }`}>
                       <button 
@@ -2865,7 +2887,7 @@ export default function Home() {
 
                         {isEmojiPickerOpen && (
                           <div className={`absolute bottom-[52px] left-0 w-[270px] border rounded-2xl p-3 shadow-xl flex flex-col z-50 animate-chat-bubble select-none ${
-                            theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                           }`}>
                             <div className="flex justify-between items-center border-b border-slate-150/10 pb-2 mb-2">
                               {EMOJI_CATEGORIES.map((cat) => (
@@ -2914,8 +2936,7 @@ export default function Home() {
                           }}
                           placeholder="Type a message..."
                           className={`w-full pl-4 pr-12 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                            theme === "dark" 
-                              ? "bg-[#04060a] border-slate-850 text-white placeholder-slate-500 focus:border-sky-500/50 focus:ring-sky-500/5" 
+                            isDark ? "bg-[#04060a] border-slate-850 text-white placeholder-slate-500 focus:border-sky-500/50 focus:ring-sky-500/5" 
                               : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50 focus:ring-sky-500/5"
                           }`}
                         />
@@ -2934,8 +2955,7 @@ export default function Home() {
                 ) : (
                   <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
                     <div className={`p-6 rounded-[28px] border flex flex-col items-center justify-center text-center gap-4 shadow-lg ${
-                      theme === "dark" 
-                        ? "bg-[#080B12]/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
+                      isDark ? "bg-[#080B12]/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
                         : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
                     }`}>
                       {activeRelationship === null && (
@@ -3011,10 +3031,10 @@ export default function Home() {
               </>
             ) : (
               <div className={`flex-1 flex flex-col items-center justify-center text-center p-8 select-none ${
-                theme === "dark" ? "bg-black" : "bg-slate-50"
+                isDark ? "bg-black" : "bg-slate-50"
               }`}>
                 <div className={`w-20 h-20 rounded-full border flex items-center justify-center text-slate-400 mb-4 shadow-sm ${
-                  theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                  isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
                 }`}>
                   <svg className="w-10 h-10 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
@@ -3032,7 +3052,7 @@ export default function Home() {
           {activeContact && isDetailPaneOpen && (
             <aside 
               className={`w-full lg:w-[320px] border-l flex flex-col items-center text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none overflow-y-auto ${
-                theme === "dark" ? "bg-black border-slate-900" : "bg-white border-slate-200"
+                isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
               }`}
             >
               {/* Cover Banner Cover */}
@@ -3060,7 +3080,7 @@ export default function Home() {
               </div>
 
               <div className="px-6 pb-6 flex-1 flex flex-col items-center">
-                <h2 className={`text-lg font-black tracking-wide mb-1 ${theme === "dark" ? "text-slate-100" : "text-slate-800"}`}>
+                <h2 className={`text-lg font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
                   {activeContact.username.toUpperCase()}
                 </h2>
                 
@@ -3069,10 +3089,10 @@ export default function Home() {
                 </span>
 
                 <div className={`w-full rounded-2xl p-4 border text-left mb-6 ${
-                  theme === "dark" ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-150"
+                  isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-150"
                 }`}>
                   <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Biography</h4>
-                  <p className={`text-xs leading-relaxed ${theme === "dark" ? "text-slate-300" : "text-slate-655"}`}>
+                  <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-655"}`}>
                     {activeContact.bio || "No biography provided by this user."}
                   </p>
                 </div>
@@ -3087,8 +3107,7 @@ export default function Home() {
                       onClick={() => startCall("video")}
                       title="Video Call"
                       className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
-                        theme === "dark" 
-                          ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
                           : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
                       }`}
                     >
@@ -3102,8 +3121,7 @@ export default function Home() {
                       onClick={() => startCall("audio")}
                       title="Voice Call"
                       className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
-                        theme === "dark" 
-                          ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
                           : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
                       }`}
                     >

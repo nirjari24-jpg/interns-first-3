@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { io } from "socket.io-client";
 import {
   User as UserIcon,
   Lock,
@@ -32,10 +33,7 @@ import {
 
 // Types
 interface User {
-  id?: string;
   username: string;
-  email?: string;
-  password?: string;
   avatarUrl: string;
   category?: string;
   bio?: string;
@@ -53,6 +51,13 @@ interface Message {
   isNew?: boolean;
 }
 
+interface MessageRequest {
+  id: string;
+  sender: string;
+  recipient: string;
+  status: 'pending' | 'accepted' | 'declined';
+}
+
 // Preset Avatars for registration and mock contacts
 const PRESET_AVATARS = [
   "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80", // Woman 1
@@ -66,50 +71,35 @@ const PRESET_AVATARS = [
 // Default built-in mock contacts based on the user's screenshot
 const MOCK_CONTACTS: User[] = [
   {
-    id: "mock_ana",
     username: "Ana Malbasa",
-    email: "ana@example.com",
-    password: "password123",
     avatarUrl: PRESET_AVATARS[0],
     category: "PERSONAL BLOG",
     bio: "Lorem Ipsum Dolor Sit Amet, Consectetur Adipiscing Elit. Donec Sit Amet Nunc Augue. Pellentesque Vel Pellentesque Tellus. Nam Lacinia Leo Sed Eleifend Dignissim.",
     statusText: "Active 5m ago"
   },
   {
-    id: "mock_paul",
     username: "Paul Osmand",
-    email: "paul@example.com",
-    password: "password123",
     avatarUrl: PRESET_AVATARS[1],
     category: "CREATIVE DESIGNER",
     bio: "Passionate about layouts, dark themes, and rich aesthetics. UI developer & animator based in London.",
     statusText: "hahah, nice!"
   },
   {
-    id: "mock_edward",
     username: "Edward Davis",
-    email: "edward@example.com",
-    password: "password123",
     avatarUrl: PRESET_AVATARS[4],
     category: "PHOTOGRAPHER",
     bio: "Capturing moments and cityscapes. Let's grab coffee and share our logs.",
     statusText: "Are we still going for a coffee?"
   },
   {
-    id: "mock_naomi",
     username: "Naomi Riste",
-    email: "naomi@example.com",
-    password: "password123",
     avatarUrl: PRESET_AVATARS[5],
     category: "WRITER",
     bio: "Words shape worlds. Blogging, script-writing, and coffee lover.",
     statusText: "What did your boss say?"
   },
   {
-    id: "mock_jonathan",
     username: "Jonathan Blake",
-    email: "jonathan@example.com",
-    password: "password123",
     avatarUrl: PRESET_AVATARS[3],
     category: "ARTIST",
     bio: "Abstract lines, digital oil paint, and visual animations.",
@@ -127,11 +117,50 @@ const EMOJI_CATEGORIES = [
 ];
 
 export default function Home() {
+  const [customApiBase, setCustomApiBase] = useState<string>("");
+  const [showServerSettings, setShowServerSettings] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chatgroup_custom_api_base");
+      if (saved) {
+        setCustomApiBase(saved);
+      }
+    }
+  }, []);
+
+  const saveCustomApiBase = (val: string) => {
+    let sanitized = val.trim();
+    if (sanitized.endsWith("/")) {
+      sanitized = sanitized.slice(0, -1);
+    }
+    setCustomApiBase(sanitized);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chatgroup_custom_api_base", sanitized);
+    }
+  };
+
+  const API_BASE = customApiBase || process.env.NEXT_PUBLIC_API_URL || 
+    (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+      ? `${window.location.protocol}//${window.location.hostname}:5000`
+      : "http://localhost:5000");
+
+  function fetchUsers() {
+    fetch(`${API_BASE}/api/users`)
+      .then(res => res.json())
+      .then(users => {
+        if (users && Array.isArray(users)) {
+          setRegisteredUsers(users);
+        }
+      })
+      .catch(err => console.warn("Error fetching users:", err));
+  }
+
   // Navigation View State
   const [currentView, setCurrentView] = useState("chat"); // "chat" or "settings"
 
   // Settings Theme
-  const [theme, setTheme] = useState<"light" | "dark" | "black">("light"); // "dark", "light", or "black"
+  const [theme, setTheme] = useState<"light" | "dark" | "black">("dark"); // "dark", "light", or "black"
   const isDark = theme === "dark" || theme === "black";
 
   // Account Detail States
@@ -164,23 +193,15 @@ export default function Home() {
 
   // Chat authentication states
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authMode, setAuthMode] = useState<"register" | "login">("register");
-  
-  // Registration Form States
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [authError, setAuthError] = useState<string | null>(null);
   const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(PRESET_AVATARS[0]);
   const [registeredUsers, setRegisteredUsers] = useState<User[]>(MOCK_CONTACTS);
-
-  // Login Form States
-  const [loginIdentifier, setLoginIdentifier] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
-
-  // Google Sign-In states
-  const [isGoogleModalOpen, setIsGoogleModalOpen] = useState(false);
-  const [isSigningInWithGoogle, setIsSigningInWithGoogle] = useState(false);
-  const [googleCustomEmail, setGoogleCustomEmail] = useState("");
 
   // Chat window states
   const [activeContact, setActiveContact] = useState<User | null>(null);
@@ -211,6 +232,66 @@ export default function Home() {
   const channelRef = useRef<BroadcastChannel | null>(null);
   const typingTimeoutRef = useRef<Record<string, NodeJS.Timeout>>({});
   const myTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<any>(null);
+  const tempMessageIdRef = useRef<string | null>(null);
+  const activeContactRef = useRef<User | null>(null);
+
+  // Message Requests state
+  const [messageRequests, setMessageRequests] = useState<MessageRequest[]>([]);
+
+  // Video devices state hooks
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedVideoDevice, setSelectedVideoDevice] = useState<string>("");
+
+  // Call state variables
+  const [callState, setCallState] = useState<"idle" | "calling" | "ringing" | "connected">("idle");
+  const [callType, setCallType] = useState<"audio" | "video">("video");
+  const [callerName, setCallerName] = useState("");
+  const [calleeName, setCalleeName] = useState("");
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isCameraOff, setIsCameraOff] = useState(false);
+  const [incomingCallInfo, setIncomingCallInfo] = useState<any>(null);
+
+  // Call WebRTC refs
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const remoteStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Audio feedback synthesis
+  const ringingOscillatorRef = useRef<AudioContext | null>(null);
+  const toneIntervalRef = useRef<any>(null);
+
+  // Refs for preventing stale closures in socket events
+  const callStateRef = useRef<"idle" | "calling" | "ringing" | "connected">("idle");
+  const incomingCallInfoRef = useRef<any>(null);
+  const calleeNameRef = useRef<string>("");
+
+  useEffect(() => {
+    callStateRef.current = callState;
+  }, [callState]);
+
+  useEffect(() => {
+    incomingCallInfoRef.current = incomingCallInfo;
+  }, [incomingCallInfo]);
+
+  useEffect(() => {
+    calleeNameRef.current = calleeName;
+  }, [calleeName]);
+
+  // Bind streams to video tags dynamically when elements mount/update
+  useEffect(() => {
+    if (localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+    }
+  }, [callState, localVideoRef.current]);
+
+  useEffect(() => {
+    if (remoteStreamRef.current && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+    }
+  }, [callState, remoteVideoRef.current]);
 
   // Time state update for Chat
   const [currentTime, setCurrentTime] = useState("12:37");
@@ -241,6 +322,346 @@ export default function Home() {
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- Audio feedback tone synthesis ---
+  const startRingingTone = () => {
+    stopTones();
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      ringingOscillatorRef.current = ctx;
+
+      const playPulse = () => {
+        if (ctx.state === 'closed') return;
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.frequency.setValueAtTime(440, ctx.currentTime);
+        gain1.gain.setValueAtTime(0.05, ctx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start();
+        osc1.stop(ctx.currentTime + 0.3);
+
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.frequency.setValueAtTime(440, ctx.currentTime + 0.4);
+        gain2.gain.setValueAtTime(0.05, ctx.currentTime + 0.4);
+        gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start();
+        osc2.stop(ctx.currentTime + 0.7);
+      };
+
+      playPulse();
+      toneIntervalRef.current = setInterval(playPulse, 2000);
+    } catch (e) {
+      console.warn("Could not start ringing tone", e);
+    }
+  };
+
+  const startCallingTone = () => {
+    stopTones();
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      ringingOscillatorRef.current = ctx;
+
+      const playPulse = () => {
+        if (ctx.state === 'closed') return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.setValueAtTime(400, ctx.currentTime);
+        gain.gain.setValueAtTime(0.04, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 1.2);
+      };
+
+      playPulse();
+      toneIntervalRef.current = setInterval(playPulse, 2500);
+    } catch (e) {
+      console.warn("Could not start calling tone", e);
+    }
+  };
+
+  const stopTones = () => {
+    if (toneIntervalRef.current) {
+      clearInterval(toneIntervalRef.current);
+      toneIntervalRef.current = null;
+    }
+    if (ringingOscillatorRef.current) {
+      try {
+        ringingOscillatorRef.current.close();
+      } catch (e) {}
+      ringingOscillatorRef.current = null;
+    }
+  };
+
+  // --- WebRTC signaling handlers & teardowns ---
+  const handleEndCallRef = useRef<any>(null);
+  handleEndCallRef.current = (notifyPeer = true) => {
+    stopTones();
+
+    // Notify other peer
+    if (notifyPeer && socketRef.current && socketRef.current.connected) {
+      const peer = callStateRef.current === 'ringing' && incomingCallInfoRef.current ? incomingCallInfoRef.current.from : calleeNameRef.current || (incomingCallInfoRef.current && incomingCallInfoRef.current.from);
+      if (peer) {
+        socketRef.current.emit('endCall', { to: peer });
+      }
+    }
+
+    // Stop local stream tracks
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+
+    // Stop remote stream tracks (if any)
+    if (remoteStreamRef.current) {
+      remoteStreamRef.current.getTracks().forEach(track => track.stop());
+      remoteStreamRef.current = null;
+    }
+
+    // Close peer connection
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
+    }
+
+    // Reset state
+    setCallState('idle');
+    setIncomingCallInfo(null);
+    setCalleeName('');
+    setCallerName('');
+    setIsMicMuted(false);
+    setIsCameraOff(false);
+    setVideoDevices([]);
+    setSelectedVideoDevice('');
+  };
+
+  const getDevices = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const vDevices = devices.filter(device => device.kind === 'videoinput');
+      setVideoDevices(vDevices);
+      if (vDevices.length > 0 && !selectedVideoDevice) {
+        setSelectedVideoDevice(vDevices[0].deviceId);
+      }
+    } catch (e) {
+      console.warn("Error enumerating devices:", e);
+    }
+  };
+
+  const changeVideoDevice = async (deviceId: string) => {
+    setSelectedVideoDevice(deviceId);
+    if (localStreamRef.current) {
+      try {
+        const oldTrack = localStreamRef.current.getVideoTracks()[0];
+        if (oldTrack) {
+          oldTrack.stop();
+          localStreamRef.current.removeTrack(oldTrack);
+        }
+
+        const constraints = {
+          audio: false,
+          video: { deviceId: { exact: deviceId }, width: 1280, height: 720 }
+        };
+
+        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        const newTrack = newStream.getVideoTracks()[0];
+
+        if (newTrack) {
+          localStreamRef.current.addTrack(newTrack);
+
+          // Update local video element
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = null;
+            localVideoRef.current.srcObject = localStreamRef.current;
+          }
+
+          // Replace track in RTCRtpSender
+          if (peerConnectionRef.current) {
+            const sender = peerConnectionRef.current.getSenders().find(s => s.track?.kind === 'video');
+            if (sender) {
+              await sender.replaceTrack(newTrack);
+              console.log("WebRTC: Video track swapped.");
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error switching video device:", error);
+        alert("Could not swap camera device.");
+      }
+    }
+  };
+
+  const initializePeerConnection = (targetUsername: string, localStream: MediaStream) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" }
+      ]
+    });
+
+    peerConnectionRef.current = pc;
+
+    // Add local tracks to peer connection
+    localStream.getTracks().forEach((track) => {
+      pc.addTrack(track, localStream);
+    });
+
+    // Send local ICE candidates to peer
+    pc.onicecandidate = (event) => {
+      if (event.candidate && socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("iceCandidate", {
+          to: targetUsername,
+          candidate: event.candidate
+        });
+      }
+    };
+
+    // Receive remote tracks
+    pc.ontrack = (event) => {
+      if (event.streams && event.streams[0]) {
+        const rStream = event.streams[0];
+        remoteStreamRef.current = rStream;
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = rStream;
+        }
+      }
+    };
+
+    return pc;
+  };
+
+  const startCall = async (type: "audio" | "video") => {
+    if (!currentUser || !activeContact) return;
+
+    setCallState("calling");
+    setCallType(type);
+    setCalleeName(activeContact.username);
+    setCallerName(currentUser.username);
+    startCallingTone();
+
+    try {
+      const constraints = {
+        audio: true,
+        video: type === "video" ? { width: 1280, height: 720 } : false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+      
+      await getDevices();
+
+      const pc = initializePeerConnection(activeContact.username, stream);
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("callUser", {
+          to: activeContact.username,
+          from: currentUser.username,
+          offer,
+          callType: type
+        });
+      }
+    } catch (e) {
+      console.error("Error starting media call:", e);
+      alert("Could not access camera/microphone. Please check permissions.");
+      handleEndCallRef.current(true);
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!currentUser || !incomingCallInfo) return;
+    stopTones();
+    setCallState("connected");
+
+    try {
+      const constraints = {
+        audio: true,
+        video: incomingCallInfo.callType === "video" ? { width: 1280, height: 720 } : false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      await getDevices();
+
+      const pc = initializePeerConnection(incomingCallInfo.from, stream);
+      await pc.setRemoteDescription(new RTCSessionDescription(incomingCallInfo.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("answerCall", {
+          to: incomingCallInfo.from,
+          answer
+        });
+      }
+    } catch (e) {
+      console.error("Error accepting call:", e);
+      alert("Could not access camera/microphone. Please check permissions.");
+      handleEndCallRef.current(true);
+    }
+  };
+
+  const declineCall = () => {
+    handleEndCallRef.current(true);
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled;
+        setIsMicMuted(!audioTrack.enabled);
+      }
+    }
+  };
+
+  const toggleCamera = () => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled;
+        setIsCameraOff(!videoTrack.enabled);
+      }
+    }
+  };
+
+  const flipCamera = async () => {
+    if (videoDevices.length <= 1) return;
+    const currentIndex = videoDevices.findIndex(d => d.deviceId === selectedVideoDevice);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % videoDevices.length;
+    const nextDevice = videoDevices[nextIndex];
+    if (nextDevice) {
+      await changeVideoDevice(nextDevice.deviceId);
+    }
+  };
+
+  // Close calls on component unmount
+  useEffect(() => {
+    return () => {
+      if (handleEndCallRef.current) {
+        handleEndCallRef.current(true);
+      }
+    };
   }, []);
 
   // Audio system triggers
@@ -280,14 +701,109 @@ export default function Home() {
     }
   };
 
+  // Fetch message requests from server
+  const fetchRequests = () => {
+    const userVal = localStorage.getItem("chatgroup_current_user");
+    if (!userVal) return;
+    const parsed = JSON.parse(userVal);
+    fetch(`${API_BASE}/api/requests?user=${parsed.username}`)
+      .then(res => res.json())
+      .then(reqs => {
+        if (reqs && Array.isArray(reqs)) {
+          setMessageRequests(reqs);
+        }
+      })
+      .catch(err => console.warn("Error fetching requests:", err));
+  };
+
+  // Helper to resolve request status between current user and a contact
+  const getChatRelationship = (contactUsername: string) => {
+    if (!currentUser || !contactUsername) return null;
+    const match = messageRequests.find(r => 
+      (r.sender.toLowerCase() === currentUser.username.toLowerCase() && r.recipient.toLowerCase() === contactUsername.toLowerCase()) ||
+      (r.sender.toLowerCase() === contactUsername.toLowerCase() && r.recipient.toLowerCase() === currentUser.username.toLowerCase())
+    );
+    return match || null;
+  };
+
+  const sendChatRequest = (recipientUsername: string) => {
+    if (!currentUser) return;
+    const existing = getChatRelationship(recipientUsername);
+    if (existing) {
+      // If it exists and was declined, reset to pending
+      fetch(`${API_BASE}/api/requests`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId: existing.id, status: 'pending' })
+      })
+      .then(res => res.json())
+      .then(updatedReq => {
+        if (updatedReq.error) {
+          alert(updatedReq.error);
+          return;
+        }
+        setMessageRequests(prev => prev.map(r => r.id === existing.id ? updatedReq : r));
+        if (socketRef.current && socketRef.current.connected) {
+          socketRef.current.emit("sendRequest", updatedReq);
+        }
+        setToast("Chat request sent! ✉️");
+        setTimeout(() => setToast(null), 3000);
+      })
+      .catch(err => console.error("Error resetting chat request:", err));
+      return;
+    }
+
+    // Normal POST
+    fetch(`${API_BASE}/api/requests`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sender: currentUser.username, recipient: recipientUsername })
+    })
+    .then(res => res.json())
+    .then(newReq => {
+      if (newReq.error) {
+        alert(newReq.error);
+        return;
+      }
+      setMessageRequests(prev => [...prev, newReq]);
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("sendRequest", newReq);
+      }
+      setToast("Chat request sent! ✉️");
+      setTimeout(() => setToast(null), 3000);
+    })
+    .catch(err => console.error("Error sending chat request:", err));
+  };
+
+  const updateChatRequest = (requestId: string, newStatus: 'accepted' | 'declined') => {
+    if (!currentUser) return;
+    fetch(`${API_BASE}/api/requests`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId, status: newStatus })
+    })
+    .then(res => res.json())
+    .then(updatedReq => {
+      if (updatedReq.error) {
+        alert(updatedReq.error);
+        return;
+      }
+      setMessageRequests(prev => prev.map(r => r.id === requestId ? updatedReq : r));
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("updateRequest", updatedReq);
+      }
+      setToast(`Request ${newStatus}! 🎉`);
+      setTimeout(() => setToast(null), 3000);
+    })
+    .catch(err => console.error("Error updating chat request:", err));
+  };
+
   // 1. Initial Load from Local Cache
   useEffect(() => {
-    // Load persisted theme
     const savedTheme = localStorage.getItem("chatgroup_theme") as "light" | "dark" | "black" | null;
     if (savedTheme) {
       setTheme(savedTheme);
     }
-
     const savedUser = localStorage.getItem("chatgroup_current_user");
     if (savedUser) {
       const parsed = JSON.parse(savedUser);
@@ -298,44 +814,218 @@ export default function Home() {
       setUsername(parsed.username);
       setBio(parsed.bio || "Available to chat in real-time.");
       setAvatar(parsed.avatarUrl);
+
+      // Validate cached session on initial mount/reconnect
+      fetch(`${API_BASE}/api/users`)
+        .then(res => res.json())
+        .then(users => {
+          if (users && Array.isArray(users)) {
+            const exists = users.some(u => u.username.toLowerCase() === parsed.username.toLowerCase());
+            if (!exists) {
+              console.warn("Stale session detected: user not found in database. Logging out.");
+              handleLogout();
+            }
+          }
+        })
+        .catch(err => console.warn("Failed to validate cached user:", err));
     }
 
-    const savedUsersList = localStorage.getItem("chatgroup_registered_users");
-    if (savedUsersList) {
-      const parsed = JSON.parse(savedUsersList) as User[];
-      const combined = [...MOCK_CONTACTS];
-      parsed.forEach((u) => {
-        if (!combined.some((c) => c.username.toLowerCase() === u.username.toLowerCase())) {
-          combined.push(u);
-        }
-      });
-      setRegisteredUsers(combined);
-    } else {
-      localStorage.setItem("chatgroup_registered_users", JSON.stringify(MOCK_CONTACTS));
-    }
-
-    const savedMessages = localStorage.getItem("chatgroup_messages");
-    if (savedMessages) {
-      setMessages(JSON.parse(savedMessages));
-    } else {
-      const defaultHistory: Message[] = [
-        { id: "h1", sender: "Ana Malbasa", recipient: "Ann", text: "Cool! Don't forget to bring your ice skaters unless you want theirs!", time: "07:43 AM" },
-        { id: "h2", sender: "Ann", recipient: "Ana Malbasa", text: "I wish I don't have those bad boys anymore, will use theirs.", time: "07:43 AM", status: "read" },
-        { id: "h3", sender: "Ana Malbasa", recipient: "Ann", text: "It's all good! It will go back quick. :)", time: "08:00 AM" },
-        { id: "h4", sender: "Ann", recipient: "Ana Malbasa", text: "", imageUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=400&q=80", time: "08:00 AM", status: "read" },
-        { id: "h5", sender: "Ann", recipient: "Ana Malbasa", text: "Wow! where did you snap that? Looks really nice!", time: "08:04 AM", status: "read" }
-      ];
-      setMessages(defaultHistory);
-      localStorage.setItem("chatgroup_messages", JSON.stringify(defaultHistory));
-    }
-
+    fetchUsers();
+    fetchRequests();
     setActiveContact(MOCK_CONTACTS[0]);
-  }, []);
+  }, [API_BASE]);
 
   // Save theme changes to Local Cache
   useEffect(() => {
     localStorage.setItem("chatgroup_theme", theme);
   }, [theme]);
+
+  // Poll users periodically
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchUsers();
+      fetchRequests();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Keep activeContactRef updated to prevent stale closures in socket events
+  useEffect(() => {
+    activeContactRef.current = activeContact;
+  }, [activeContact]);
+
+  // Socket.io Real-time connection and event listeners
+  useEffect(() => {
+    if (!currentUser) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      return;
+    }
+
+    const socket = io(API_BASE);
+    socketRef.current = socket;
+
+    const registerSocket = () => {
+      console.log("Registering socket for user:", currentUser.username);
+      socket.emit("join", currentUser.username);
+    };
+
+    if (socket.connected) {
+      registerSocket();
+    }
+
+    socket.on("connect", () => {
+      console.log("Connected to WebSockets server:", socket.id);
+      registerSocket();
+    });
+
+    // Listen for incoming messages
+    socket.on("newMessage", (newMsg: Message) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === newMsg.id)) return prev;
+        return [...prev, newMsg];
+      });
+
+      const currentActive = activeContactRef.current;
+      if (currentActive && currentActive.username === newMsg.sender) {
+        playSound("receive");
+        fetch(`${API_BASE}/api/messages/read`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sender: newMsg.sender,
+            recipient: currentUser.username
+          })
+        }).catch(err => console.warn("Error marking message as read:", err));
+      } else {
+        playSound("receive");
+      }
+      setTimeout(() => scrollToBottom("smooth"), 50);
+    });
+
+    // Listen for message confirmation/acks from server
+    socket.on("messageAck", (ackedMsg: Message) => {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === ackedMsg.id)) return prev;
+        return prev.map(m => m.id === tempMessageIdRef.current ? ackedMsg : m);
+      });
+      setTimeout(() => scrollToBottom("smooth"), 50);
+    });
+
+    // Listen for typing indicator
+    socket.on("typing", (data: { from: string; isTyping: boolean }) => {
+      setTypingUsers((prev) => ({ ...prev, [data.from]: data.isTyping }));
+    });
+
+    // Listen for online/offline statuses
+    socket.on("userStatus", (data: { username: string; status: "online" | "offline" }) => {
+      setOnlineUsers((prev) => ({ ...prev, [data.username]: data.status }));
+    });
+
+    // Listen for incoming WebRTC calls and signaling
+    socket.on("incomingCall", (data: { from: string; offer: any; callType: "audio" | "video" }) => {
+      console.log("incomingCall event received from:", data.from, "current callState:", callStateRef.current);
+      if (callStateRef.current !== "idle") {
+        socket.emit("endCall", { to: data.from });
+        return;
+      }
+      setIncomingCallInfo(data);
+      setCallState("ringing");
+      setCallType(data.callType);
+      setCallerName(data.from);
+      startRingingTone();
+    });
+
+    socket.on("callAnswered", async (data: { answer: any }) => {
+      console.log("callAnswered event received");
+      if (peerConnectionRef.current) {
+        try {
+          await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          setCallState("connected");
+          stopTones();
+        } catch (e) {
+          console.error("Error setting remote answer description:", e);
+          if (handleEndCallRef.current) {
+            handleEndCallRef.current(true);
+          }
+        }
+      }
+    });
+
+    socket.on("iceCandidate", async (data: { candidate: any }) => {
+      if (peerConnectionRef.current && data.candidate) {
+        try {
+          await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+          console.error("Error adding ice candidate:", e);
+        }
+      }
+    });
+
+    socket.on("endCall", () => {
+      console.log("endCall event received from peer");
+      if (handleEndCallRef.current) {
+        handleEndCallRef.current(false);
+      }
+    });
+
+    socket.on("callError", (data: { message: string }) => {
+      alert(data.message);
+      if (handleEndCallRef.current) {
+        handleEndCallRef.current(false);
+      }
+    });
+
+    socket.on("incomingRequest", (newReq: MessageRequest) => {
+      setMessageRequests((prev) => {
+        if (prev.some((r) => r.id === newReq.id)) return prev;
+        return [...prev, newReq];
+      });
+      setToast(`Incoming message request from ${newReq.sender}! ✉️`);
+      setTimeout(() => setToast(null), 3000);
+    });
+
+    socket.on("requestUpdated", (updatedReq: MessageRequest) => {
+      setMessageRequests((prev) =>
+        prev.map((r) => r.id === updatedReq.id ? updatedReq : r)
+      );
+      setToast(`Chat request was ${updatedReq.status}! 🎉`);
+      setTimeout(() => setToast(null), 3000);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentUser?.username, API_BASE]);
+
+  // Load messages & read receipts on conversation change
+  useEffect(() => {
+    if (currentUser && activeContact) {
+      fetch(`${API_BASE}/api/messages?user1=${currentUser.username}&user2=${activeContact.username}`)
+        .then(res => res.json())
+        .then(msgs => {
+          if (msgs && Array.isArray(msgs)) {
+            setMessages(msgs);
+            setTimeout(() => scrollToBottom("smooth"), 50);
+          }
+        })
+        .catch(err => console.warn("Error fetching messages:", err));
+
+      // Mark messages as read
+      fetch(`${API_BASE}/api/messages/read`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sender: activeContact.username,
+          recipient: currentUser.username
+        })
+      })
+      .catch(err => console.warn("Error marking messages as read:", err));
+    }
+  }, [activeContact, currentUser, API_BASE]);
 
   // 2. Setup BroadcastChannel for Real-time synchronizations
   useEffect(() => {
@@ -461,14 +1151,15 @@ export default function Home() {
 
   // Handle local user keystroke relays for typing animations
   const handleUserTyping = (textLength: number) => {
-    if (!channelRef.current || !currentUser || !activeContact) return;
+    if (!currentUser || !activeContact) return;
 
-    channelRef.current.postMessage({
-      type: "TYPING",
-      from: currentUser.username,
-      to: activeContact.username,
-      isTyping: textLength > 0
-    });
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("typing", {
+        from: currentUser.username,
+        to: activeContact.username,
+        isTyping: textLength > 0
+      });
+    }
 
     if (myTypingTimeoutRef.current) {
       clearTimeout(myTypingTimeoutRef.current);
@@ -476,9 +1167,8 @@ export default function Home() {
 
     if (textLength > 0) {
       myTypingTimeoutRef.current = setTimeout(() => {
-        if (channelRef.current && currentUser && activeContact) {
-          channelRef.current.postMessage({
-            type: "TYPING",
+        if (socketRef.current && socketRef.current.connected && currentUser && activeContact) {
+          socketRef.current.emit("typing", {
             from: currentUser.username,
             to: activeContact.username,
             isTyping: false
@@ -492,17 +1182,54 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
+  // Submit login form
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    if (!authEmail.trim() || !authPassword) return;
+
+    fetch(`${API_BASE}/api/users/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: authEmail.trim(),
+        password: authPassword
+      })
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Login failed");
+      }
+      return data;
+    })
+    .then(user => {
+      setCurrentUser(user);
+      localStorage.setItem("chatgroup_current_user", JSON.stringify(user));
+
+      // Sync settings dashboard profiles
+      setName(user.username);
+      setUsername(user.username);
+      setAvatar(user.avatarUrl);
+      setBio(user.bio || "");
+
+      fetchUsers();
+      setToast("Logged in successfully! 👋");
+      setTimeout(() => setToast(null), 3000);
+    })
+    .catch(err => {
+      console.error("Login error:", err);
+      setAuthError(err.message);
+    });
+  };
+
   // Submit registration form
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regUsername.trim() || !regEmail.trim() || !regPassword) {
-      setToast("Please fill in all registration fields! ❌");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
+    setAuthError(null);
+    if (!regUsername.trim() || !regEmail.trim() || !regPassword) return;
 
-    const newUser: User = {
-      id: "u_" + Math.random().toString(36).substr(2, 9),
+    const reqBody = {
       username: regUsername.trim(),
       email: regEmail.trim().toLowerCase(),
       password: regPassword,
@@ -511,129 +1238,31 @@ export default function Home() {
       bio: "Joined ChatGroup. Let's communicate in real-time."
     };
 
-    // Check if duplicate of exact (username, email, password) already exists
-    const duplicate = registeredUsers.some(
-      (u) =>
-        u.username.toLowerCase() === newUser.username.toLowerCase() &&
-        u.email?.toLowerCase() === newUser.email?.toLowerCase() &&
-        u.password === newUser.password
-    );
-
-    if (duplicate) {
-      setToast("An account with this username, email and password already exists! ❌");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-
-    setCurrentUser(newUser);
-    localStorage.setItem("chatgroup_current_user", JSON.stringify(newUser));
-
-    // Sync settings dashboard profiles
-    setName(newUser.username);
-    setUsername(newUser.username.toLowerCase().replace(/\s+/g, "_"));
-    setAvatar(newUser.avatarUrl);
-    setBio(newUser.bio || "");
-    setEmail(newUser.email || "");
-    setCurrentPassword(newUser.password || "");
-
-    setRegisteredUsers((prev) => {
-      const nextList = [...prev, newUser];
-      localStorage.setItem("chatgroup_registered_users", JSON.stringify(nextList));
-      return nextList;
-    });
-
-    const channel = new BroadcastChannel("chatgroup_realtime");
-    channel.postMessage({
-      type: "USER_REGISTER",
-      user: newUser
-    });
-    channel.close();
-
-    setToast("Account registered successfully! Welcome. 🎉");
-    setTimeout(() => setToast(null), 3000);
-
-    // Clear registration fields
-    setRegUsername("");
-    setRegEmail("");
-    setRegPassword("");
-  };
-
-  // Submit login form
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginIdentifier.trim() || !loginPassword) {
-      setToast("Please fill in all login fields! ❌");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
-
-    const identifier = loginIdentifier.trim().toLowerCase();
-
-    // Query registeredUsers for an account with matching (username OR email) AND matching password
-    const matchedUser = registeredUsers.find(
-      (u) =>
-        (u.username.toLowerCase() === identifier || u.email?.toLowerCase() === identifier) &&
-        u.password === loginPassword
-    );
-
-    if (matchedUser) {
-      setCurrentUser(matchedUser);
-      localStorage.setItem("chatgroup_current_user", JSON.stringify(matchedUser));
-
-      // Sync settings dashboard profiles
-      setName(matchedUser.username);
-      setUsername(matchedUser.username.toLowerCase().replace(/\s+/g, "_"));
-      setAvatar(matchedUser.avatarUrl);
-      setBio(matchedUser.bio || "");
-      if (matchedUser.email) setEmail(matchedUser.email);
-      if (matchedUser.password) setCurrentPassword(matchedUser.password);
-
-      setToast(`Logged in as ${matchedUser.username}! Welcome back. 👋`);
-      setTimeout(() => setToast(null), 3000);
-
-      // Clear login fields
-      setLoginIdentifier("");
-      setLoginPassword("");
-    } else {
-      setToast("Invalid username/email or password! ❌");
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
-
-  // Google ID Sign-in handler
-  const handleGoogleSignIn = (gUsername: string, emailStr: string, avatarUrlStr: string) => {
-    setIsSigningInWithGoogle(true);
-
-    // Simulate minor network delay for OAuth realism
-    setTimeout(() => {
-      const newUser: User = {
-        id: "google_" + Math.random().toString(36).substr(2, 9),
-        username: gUsername.trim(),
-        email: emailStr,
-        password: "google_oauth",
-        avatarUrl: avatarUrlStr,
-        category: "MEMBER",
-        bio: `Logged in via Google (${emailStr}).`
-      };
-
+    fetch(`${API_BASE}/api/users/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(reqBody)
+    })
+    .then(async res => {
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Registration failed");
+      }
+      return data;
+    })
+    .then(newUser => {
       setCurrentUser(newUser);
       localStorage.setItem("chatgroup_current_user", JSON.stringify(newUser));
 
       // Sync settings dashboard profiles
       setName(newUser.username);
-      setUsername(newUser.username.toLowerCase().replace(/\s+/g, "_"));
+      setUsername(newUser.username);
       setAvatar(newUser.avatarUrl);
       setBio(newUser.bio || "");
-      setEmail(emailStr);
-      setCurrentPassword("google_oauth");
 
-      setRegisteredUsers((prev) => {
-        const exists = prev.some((u) => u.username.toLowerCase() === newUser.username.toLowerCase() && u.email?.toLowerCase() === emailStr.toLowerCase());
-        if (exists) return prev;
-        const nextList = [...prev, newUser];
-        localStorage.setItem("chatgroup_registered_users", JSON.stringify(nextList));
-        return nextList;
-      });
+      fetchUsers();
+      setToast("Account created successfully! 🎉");
+      setTimeout(() => setToast(null), 3000);
 
       const channel = new BroadcastChannel("chatgroup_realtime");
       channel.postMessage({
@@ -641,14 +1270,11 @@ export default function Home() {
         user: newUser
       });
       channel.close();
-
-      setIsSigningInWithGoogle(false);
-      setIsGoogleModalOpen(false);
-
-      // Trigger success toast
-      setToast("Signed in with Google successfully! 🛡️");
-      setTimeout(() => setToast(null), 3000);
-    }, 1200);
+    })
+    .catch(err => {
+      console.error("Registration error:", err);
+      setAuthError(err.message);
+    });
   };
 
   // Send message submit
@@ -662,52 +1288,52 @@ export default function Home() {
       minute: "2-digit"
     });
 
+    const tempId = Math.random().toString(36).substring(2, 9);
+    tempMessageIdRef.current = tempId;
+
     const newMsg: Message = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: tempId,
       sender: currentUser.username,
       recipient: activeContact.username,
       text: textContent,
       imageUrl: imageLink,
       time: timeStringVal,
-      status: "sent",
-      isNew: true
+      status: "sent"
     };
 
-    setMessages((prev) => {
-      const nextMsgs = [...prev, newMsg];
-      localStorage.setItem("chatgroup_messages", JSON.stringify(nextMsgs));
-      return nextMsgs;
-    });
-
+    setMessages((prev) => [...prev, newMsg]);
     setInputText("");
     playSound("send");
     setTimeout(() => scrollToBottom("smooth"), 50);
 
-    if (myTypingTimeoutRef.current) {
-      clearTimeout(myTypingTimeoutRef.current);
-    }
-    if (channelRef.current) {
-      channelRef.current.postMessage({
-        type: "TYPING",
+    // Emit message through Socket
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("sendMessage", {
+        sender: currentUser.username,
+        recipient: activeContact.username,
+        text: textContent,
+        imageUrl: imageLink,
+        time: timeStringVal
+      });
+
+      socketRef.current.emit("typing", {
         from: currentUser.username,
         to: activeContact.username,
         isTyping: false
       });
-      channelRef.current.postMessage({
-        type: "MSG",
-        msg: newMsg,
-        from: currentUser.username,
-        to: activeContact.username
-      });
+    } else {
+      // Fallback to REST API
+      fetch(`${API_BASE}/api/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMsg)
+      })
+      .then(res => res.json())
+      .then(savedMsg => {
+        setMessages(prev => prev.map(m => m.id === tempId ? savedMsg : m));
+      })
+      .catch(err => console.error("Error saving message via REST fallback:", err));
     }
-
-    setTimeout(() => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === newMsg.id ? { ...msg, status: "delivered" } : msg
-        )
-      );
-    }, 1000);
 
     const isMock = MOCK_CONTACTS.some((c) => c.username === activeContact.username);
     const isOffline = onlineUsers[activeContact.username] === "offline" || !onlineUsers[activeContact.username];
@@ -736,24 +1362,27 @@ export default function Home() {
           minute: "2-digit"
         });
 
-        const replyMessage: Message = {
-          id: Math.random().toString(36).substring(2, 9),
-          sender: contactName,
-          recipient: currentUser?.username || "Ann",
-          text,
-          time: timeStringVal,
-          isNew: true
-        };
+        if (!currentUser) return;
 
-        setMessages((prev) => {
-          const next = [...prev, replyMessage];
-          localStorage.setItem("chatgroup_messages", JSON.stringify(next));
-          return next;
-        });
-
-        setTypingUsers((prev) => ({ ...prev, [contactName]: false }));
-        playSound("receive");
-        setTimeout(() => scrollToBottom("smooth"), 50);
+        fetch(`${API_BASE}/api/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sender: contactName,
+            recipient: currentUser.username,
+            text,
+            time: timeStringVal,
+            status: "sent"
+          })
+        })
+        .then(res => res.json())
+        .then(savedMsg => {
+          setMessages(prev => [...prev, savedMsg]);
+          setTypingUsers((prev) => ({ ...prev, [contactName]: false }));
+          playSound("receive");
+          setTimeout(() => scrollToBottom("smooth"), 50);
+        })
+        .catch(err => console.error("Error saving mock reply:", err));
       }, 2000);
     }, 1500);
   };
@@ -770,11 +1399,15 @@ export default function Home() {
     handleSendMessage("", chosenImage);
   };
 
-  const handleLogout = () => {
+  function handleLogout() {
     setCurrentUser(null);
     setActiveContact(MOCK_CONTACTS[0]);
     localStorage.removeItem("chatgroup_current_user");
-  };
+  }
+
+  // Resolve chat relationship and status
+  const activeRelationship = activeContact ? getChatRelationship(activeContact.username) : null;
+  const isAccepted = activeRelationship?.status === "accepted";
 
   // Filters messages for selected user
   const conversationMessages = messages.filter(
@@ -861,32 +1494,39 @@ export default function Home() {
     e.preventDefault();
     
     if (currentUser) {
-      const updatedUser: User = {
-        ...currentUser,
-        username: username.trim(),
+      const reqBody = {
+        username: currentUser.username,
         avatarUrl: avatar,
         bio: bio.trim()
       };
-      
-      setCurrentUser(updatedUser);
-      localStorage.setItem("chatgroup_current_user", JSON.stringify(updatedUser));
-      
-      setRegisteredUsers((prev) => {
-        const list = prev.map(u => u.username.toLowerCase() === currentUser.username.toLowerCase() ? updatedUser : u);
-        localStorage.setItem("chatgroup_registered_users", JSON.stringify(list));
-        return list;
+
+      fetch(`${API_BASE}/api/users/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reqBody)
+      })
+      .then(res => res.json())
+      .then(updatedUser => {
+        setCurrentUser(updatedUser);
+        localStorage.setItem("chatgroup_current_user", JSON.stringify(updatedUser));
+        
+        fetchUsers();
+
+        if (channelRef.current) {
+          channelRef.current.postMessage({
+            type: "USER_REGISTER",
+            user: updatedUser
+          });
+        }
+        setToast("Account details updated successfully! 🎉");
+        setTimeout(() => setToast(null), 3000);
+      })
+      .catch(err => {
+        console.error("Error updating profile:", err);
+        setToast("Error updating profile. Please try again. ❌");
+        setTimeout(() => setToast(null), 3000);
       });
-
-      if (channelRef.current) {
-        channelRef.current.postMessage({
-          type: "USER_REGISTER",
-          user: updatedUser
-        });
-      }
     }
-
-    setToast("Account details updated successfully! 🎉");
-    setTimeout(() => setToast(null), 3000);
   };
 
   const handleSavePassword = (e: React.FormEvent) => {
@@ -931,8 +1571,7 @@ export default function Home() {
       <main className={`min-h-screen w-full transition-colors duration-500 flex flex-col justify-start items-center p-4 sm:p-6 md:p-12 font-sans relative overflow-y-auto ${
         theme === "black" 
           ? "bg-black text-[#E4E6EB] black-theme" 
-          : theme === "dark" 
-            ? "bg-[#04060A] text-[#E4E6EB]" 
+          : isDark ? "bg-[#04060A] text-[#E4E6EB]" 
             : "bg-slate-50 text-black light-theme"
       }`}>
         
@@ -967,8 +1606,7 @@ export default function Home() {
           
           {/* Top Header Panel */}
           <div className={`relative border rounded-3xl p-5 md:p-6 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden transition-colors duration-500 ${
-            isDark 
-              ? "bg-gradient-to-r from-slate-950 via-[#0B0F19] to-slate-950 border-slate-800/80" 
+            isDark ? "bg-gradient-to-r from-black via-[#08080C] to-black border-slate-900" 
               : "bg-white border-slate-200"
           }`}>
             
@@ -980,8 +1618,7 @@ export default function Home() {
               <button
                 onClick={() => setCurrentView("chat")}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  isDark
-                    ? "bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800"
+                  isDark ? "bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800"
                     : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
                 }`}
                 title="Back to ChatRoom"
@@ -1006,23 +1643,25 @@ export default function Home() {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setTheme(prev => {
-                  if (prev === "light") return "dark";
-                  if (prev === "dark") return "black";
-                  return "light";
-                })}
+                onClick={() => {
+                  setTheme(prev => {
+                    const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
+                    setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
+                    setTimeout(() => setToast(null), 2500);
+                    return next;
+                  });
+                }}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
                   theme === "black"
                     ? "bg-[#121212] border-neutral-900 text-amber-400 hover:bg-neutral-900"
-                    : theme === "dark"
-                      ? "bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-850"
+                    : isDark ? "bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-850"
                       : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
                 }`}
-                title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : theme === "dark" ? "Dark Mode" : "Light Mode"})`}
+                title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
               >
                 {theme === "black" ? (
                   <Sun className="w-4.5 h-4.5" />
-                ) : theme === "dark" ? (
+                ) : isDark ? (
                   <Sparkles className="w-4.5 h-4.5" />
                 ) : (
                   <Moon className="w-4.5 h-4.5" />
@@ -1044,17 +1683,17 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="hidden lg:block lg:col-span-4 space-y-6">
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 ${
-                isDark ? "bg-[#080B12]/80 border-slate-800/80" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <h3 className={`text-xs font-extrabold uppercase tracking-wider mb-4 px-1.5 ${isDark ? "text-slate-400" : "text-black"}`}>Settings Hub</h3>
                 
                 <div className="space-y-1.5">
                   <button
                     onClick={() => setActiveSection("profile")}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-bold text-xs.5 transition-all text-left ${
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
                       activeSection === "profile"
-                        ? "bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 text-cyan-400 border border-cyan-500/20"
-                        : isDark ? "text-slate-400 hover:text-slate-200" : "text-black hover:text-cyan-500"
+                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
+                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
                     }`}
                   >
                     <UserIcon className="w-4.5 h-4.5" />
@@ -1063,10 +1702,10 @@ export default function Home() {
 
                   <button
                     onClick={() => setActiveSection("security")}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-bold text-xs.5 transition-all text-left ${
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
                       activeSection === "security"
-                        ? "bg-gradient-to-r from-cyan-500/10 to-indigo-500/10 text-cyan-400 border border-cyan-500/20"
-                        : isDark ? "text-slate-400 hover:text-slate-200" : "text-black hover:text-cyan-500"
+                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
+                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
                     }`}
                   >
                     <Lock className="w-4.5 h-4.5" />
@@ -1076,7 +1715,7 @@ export default function Home() {
               </div>
 
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#080B12]/80 border-slate-800/80" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
 
@@ -1128,8 +1767,7 @@ export default function Home() {
 
             <div className="lg:col-span-8 w-full space-y-4">
               <div className={`flex lg:hidden gap-1.5 p-1.5 rounded-2xl border transition-colors duration-500 ${
-                isDark 
-                  ? "bg-slate-950/40 border-slate-800/80" 
+                isDark ? "bg-slate-950/40 border-slate-800/80" 
                   : "bg-white border-slate-200 shadow-sm"
               }`}>
                 <button
@@ -1137,8 +1775,7 @@ export default function Home() {
                   onClick={() => setActiveSection("profile")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "profile"
-                      ? isDark
-                        ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
+                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
                         : "bg-cyan-50 text-cyan-600 border border-cyan-200"
                       : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
@@ -1152,8 +1789,7 @@ export default function Home() {
                   onClick={() => setActiveSection("security")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "security"
-                      ? isDark
-                        ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
+                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
                         : "bg-cyan-50 text-cyan-600 border border-cyan-200"
                       : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
@@ -1165,7 +1801,7 @@ export default function Home() {
               
               {activeSection === "profile" && (
                 <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  isDark ? "bg-[#080B12]/80 border-slate-800/80" : "bg-white border-slate-200 shadow-md"
+                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
                 }`}>
                   <form onSubmit={handleSaveProfile} className="space-y-6">
                     <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
@@ -1226,8 +1862,7 @@ export default function Home() {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your full name..."
@@ -1242,8 +1877,7 @@ export default function Home() {
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your username..."
@@ -1263,8 +1897,7 @@ export default function Home() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="your.email@domain.com"
@@ -1284,8 +1917,7 @@ export default function Home() {
                             value={phone}
                             onChange={(e) => setPhone(e.target.value)}
                             className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Your phone number..."
@@ -1301,8 +1933,7 @@ export default function Home() {
                           value={bio}
                           onChange={(e) => setBio(e.target.value)}
                           className={`w-full border rounded-2xl p-4.5 text-xs.5 outline-none transition duration-300 resize-none ${
-                            isDark 
-                              ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                            isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                               : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                           }`}
                           placeholder="Write something about yourself..."
@@ -1322,7 +1953,7 @@ export default function Home() {
 
               {activeSection === "security" && (
                 <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  isDark ? "bg-[#080B12]/80 border-slate-800/80" : "bg-white border-slate-200 shadow-md"
+                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
                 }`}>
                   <form onSubmit={handleSavePassword} className="space-y-6">
                     <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
@@ -1342,8 +1973,7 @@ export default function Home() {
                             value={currentPassword}
                             onChange={(e) => setCurrentPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Type current password..."
@@ -1367,8 +1997,7 @@ export default function Home() {
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Type new secure password..."
@@ -1431,8 +2060,7 @@ export default function Home() {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark 
-                                ? "bg-slate-950/60 border-slate-800 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
+                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="Verify new secure password..."
@@ -1460,7 +2088,7 @@ export default function Home() {
               )}
 
               <div className={`block lg:hidden border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#080B12]/80 border-slate-800/80" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
 
@@ -1524,18 +2152,15 @@ export default function Home() {
     <div className={`w-full h-screen max-h-screen text-slate-800 flex flex-col font-sans antialiased overflow-hidden ${
       theme === "black" 
         ? "bg-black text-slate-100 black-theme" 
-        : theme === "dark" 
-          ? "bg-slate-950 text-slate-100" 
+        : isDark ? "bg-slate-950 text-slate-100" 
           : "bg-white text-slate-800"
     }`}>
       
       {/* 1. TOP CHATGROUP NAVBAR */}
-      <header className={`h-[60px] border-b px-6 flex items-center justify-between z-50 flex-shrink-0 ${
+      <header className={`h-[60px] border-b px-6 flex items-center justify-between z-50 flex-shrink-0 backdrop-blur-md ${
         theme === "black"
           ? "bg-black border-neutral-900"
-          : isDark 
-            ? "bg-slate-900 border-slate-800" 
-            : "bg-white border-slate-200"
+          : isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
       }`}>
         
         {/* Left Branding */}
@@ -1549,182 +2174,245 @@ export default function Home() {
         </div>
 
         {/* Center Search bar */}
-        {currentUser && (
-          <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-            theme === "black"
-              ? "bg-[#0a0a0a] border-neutral-800"
-              : isDark 
-                ? "bg-slate-950 border-slate-800" 
-                : "bg-slate-100 border-slate-200"
-          }`}>
-            <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+        <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
+          theme === "black"
+            ? "bg-[#0a0a0a] border-neutral-900"
+            : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
+        }`}>
+          <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
+          />
+        </div>
+
+        {/* Right Nav Icons */}
+        <div className="flex items-center gap-5">
+          {/* Search Icon */}
+          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
             </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
-            />
-          </div>
-        )}
+          </button>
+          
+          {/* Direct Messages Icon */}
+          <button className="text-slate-500 hover:text-slate-800 transition-colors relative">
+            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+            <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white">1</span>
+          </button>
 
-        {/* Right Nav Icons / Theme Toggle (if not logged in) */}
-        <div className="flex items-center gap-5">
+          {/* Theme Toggle Button */}
+          <button
+            onClick={() => {
+              setTheme(prev => {
+                const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
+                setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
+                setTimeout(() => setToast(null), 2500);
+                return next;
+              });
+            }}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
+              theme === "black"
+                ? "bg-[#121212] border-neutral-900 text-yellow-400 hover:bg-neutral-900 shadow-md"
+                : isDark ? "bg-slate-900 border-slate-800 text-yellow-400 hover:bg-slate-850 hover:text-yellow-300 shadow-md shadow-yellow-500/5" 
+                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 shadow-sm"
+            }`}
+            title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
+          >
+            {theme === "black" ? (
+              <Sun className="w-4 h-4 text-yellow-400" />
+            ) : isDark ? (
+              <Sparkles className="w-4.5 h-4.5" />
+            ) : (
+              <Moon className="w-4 h-4 text-slate-650" />
+            )}
+          </button>
+
+          {/* Settings gear icon */}
+          <button 
+            onClick={() => {
+              if (currentUser) {
+                setName(currentUser.username);
+                setUsername(currentUser.username);
+                setBio(currentUser.bio || "");
+                setAvatar(currentUser.avatarUrl);
+              }
+              setCurrentView("settings");
+            }}
+            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400 hover:scale-105 transition-all shadow-md shadow-cyan-500/5 active:scale-95 flex items-center gap-1.5 font-extrabold text-xs cursor-pointer"
+            title="Settings Dashboard"
+          >
+            <svg className="w-4.5 h-4.5 stroke-[2.2] animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span className="hidden sm:inline">Profile Settings</span>
+          </button>
+
+          {/* Home Icon */}
+          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+            </svg>
+          </button>
+
+          {/* Notifications Heart */}
+          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+          </button>
+
+          {/* Logged in user avatar */}
           {currentUser ? (
-            <>
-              {/* Search Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-                </svg>
-              </button>
-              
-              {/* Direct Messages Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors relative">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-                <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white">1</span>
-              </button>
-
-              {/* Settings gear icon */}
-              <button 
-                onClick={() => {
-                  setName(currentUser.username);
-                  setUsername(currentUser.username);
-                  setBio(currentUser.bio || "");
-                  setAvatar(currentUser.avatarUrl);
-                  setCurrentView("settings");
-                }}
-                className="text-slate-500 hover:text-slate-800 transition-colors"
-                title="Settings Dashboard"
-              >
-                <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-
-              {/* Home Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-                </svg>
-              </button>
-
-              {/* Notifications Heart */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-                </svg>
-              </button>
-
-              {/* Logged in user avatar */}
+            <div className="relative group cursor-pointer" onClick={() => {
+              if (currentUser) {
+                setName(currentUser.username);
+                setUsername(currentUser.username);
+                setBio(currentUser.bio || "");
+                setAvatar(currentUser.avatarUrl);
+              }
+              setCurrentView("settings");
+            }}>
+              <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
               <img
                 src={currentUser.avatarUrl}
                 alt={currentUser.username}
-                className="w-7 h-7 rounded-full object-cover border border-slate-200 active:scale-95 transition-transform"
+                className="relative w-8 h-8 rounded-full object-cover border border-black active:scale-95 transition-transform"
               />
-            </>
+            </div>
           ) : (
-            /* Theme Toggle Button for Logged-Out Users */
-            <button
-              onClick={() => setTheme(prev => {
-                if (prev === "light") return "dark";
-                if (prev === "dark") return "black";
-                return "light";
-              })}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
-                theme === "black"
-                  ? "bg-[#121212] border-neutral-900 text-amber-400 hover:bg-neutral-900"
-                  : isDark
-                    ? "bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-850"
-                    : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
-              }`}
-              title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : theme === "dark" ? "Dark Mode" : "Light Mode"})`}
-            >
-              {theme === "black" ? (
-                <Sun className="w-4 h-4" />
-              ) : theme === "dark" ? (
-                <Sparkles className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-            </button>
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 border border-white/20 flex items-center justify-center text-white">
+              <span className="text-[10px] font-bold">U</span>
+            </div>
           )}
         </div>
       </header>
 
       {/* 2. AUTH / LOGOUT / REGISTER CONTAINER */}
       {!currentUser ? (
-        <div className={`flex-1 flex items-center justify-center p-6 ${
+        <div className={`flex-1 flex items-center justify-center p-6 relative overflow-hidden ${
           theme === "black"
-            ? "bg-black"
-            : isDark ? "bg-slate-900" : "bg-white"
+            ? "bg-black black-theme"
+            : isDark ? "bg-slate-950" : "bg-slate-50"
         }`}>
-          <div className={`w-full max-w-[390px] rounded-2xl p-8 shadow-[0_15px_40px_rgba(0,0,0,0.04)] flex flex-col items-center animate-chat-bubble border ${
-            theme === "black"
-              ? "bg-[#050505] border-neutral-900 text-slate-100"
-              : isDark ? "bg-slate-950 border-slate-800 text-slate-100" : "bg-white border-slate-200 text-slate-850"
-          }`}>
-            {/* Auth Mode Toggle Tabs */}
-            <div className={`flex w-full border-b mb-5 ${
-              theme === "black" ? "border-neutral-900" : isDark ? "border-slate-800" : "border-slate-100"
-            }`}>
-              <button
-                type="button"
-                onClick={() => setAuthMode("register")}
-                className={`flex-1 pb-2 text-[11px] font-bold tracking-widest uppercase transition-all border-b-2 cursor-pointer ${
-                  authMode === "register"
-                    ? "border-sky-500 text-sky-500"
-                    : "border-transparent text-slate-400 hover:text-slate-500"
-                }`}
-              >
-                Register
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode("login")}
-                className={`flex-1 pb-2 text-[11px] font-bold tracking-widest uppercase transition-all border-b-2 cursor-pointer ${
-                  authMode === "login"
-                    ? "border-sky-500 text-sky-500"
-                    : "border-transparent text-slate-400 hover:text-slate-500"
-                }`}
-              >
-                Login
-              </button>
-            </div>
+          {/* Floating background glowing orbs */}
+          <div className="absolute inset-0 pointer-events-none z-0">
+            <div className={`absolute top-[10%] left-[15%] w-[250px] sm:w-[320px] h-[250px] sm:h-[320px] rounded-full blur-[100px] transition-opacity duration-700 animate-float-slow ${
+              isDark ? "bg-indigo-600/15 opacity-100" : "bg-indigo-400/10 opacity-80"
+            }`} />
+            <div className={`absolute bottom-[10%] right-[15%] w-[280px] sm:w-[350px] h-[280px] sm:h-[350px] rounded-full blur-[110px] transition-opacity duration-700 animate-float-medium ${
+              isDark ? "bg-sky-500/15 opacity-100" : "bg-sky-400/10 opacity-80"
+            }`} />
+          </div>
 
-            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/10 mb-4 text-white">
+          <div className={`w-full max-w-[420px] rounded-[32px] p-8 shadow-[0_24px_60px_rgba(0,0,0,0.15)] flex flex-col items-center animate-chat-bubble border relative z-10 ${
+            theme === "black"
+              ? "bg-[#050505] border-neutral-900 text-slate-100 black-theme"
+              : isDark ? "glass-card-dark text-slate-100" : "glass-card-light text-slate-800"
+          }`}>
+            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-sky-500/40 to-transparent" />
+            
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-lg shadow-sky-500/10 mb-4 text-white">
               <svg className="w-7 h-7 stroke-[2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
             </div>
 
-            <h2 className={`text-xl font-extrabold tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-              {authMode === "register" ? "Create Account" : "Welcome Back"}
+            <h2 className={`text-2xl font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+              {authMode === "login" ? "Welcome Back" : "Create Account"}
             </h2>
-            <p className="text-[12px] text-slate-400 text-center mb-5 leading-relaxed">
-              {authMode === "register" 
-                ? "Register a username and password to start chatting in real-time."
-                : "Enter your username/email and password to join your server chat."
-              }
+            <p className="text-[12px] text-slate-400 text-center mb-6 leading-relaxed">
+              {authMode === "login" 
+                ? "Enter your credentials to access your profile and conversations." 
+                : "Sign up with an email and username to connect with others."}
             </p>
 
-            {authMode === "register" ? (
+            {authError && (
+              <div className="w-full mb-4 px-4 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs font-bold flex items-center gap-2">
+                <svg className="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>{authError}</span>
+              </div>
+            )}
+
+            {authMode === "login" ? (
+              /* LOGIN FORM */
+              <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Email Address</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    placeholder="e.g. ana@chatgroup.com"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
+                    }`}
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
+                  <input
+                    type="password"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
+                    }`}
+                    required
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:brightness-110 font-bold text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm mt-2 cursor-pointer"
+                >
+                  Sign In
+                </button>
+
+                <p className="text-[11.5px] text-slate-450 text-center mt-3 font-semibold">
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("register");
+                      setAuthError(null);
+                    }}
+                    className="text-sky-500 hover:underline font-bold"
+                  >
+                    Sign Up
+                  </button>
+                </p>
+              </form>
+            ) : (
+              /* REGISTER FORM */
               <form onSubmit={handleRegister} className="w-full flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Select Profile Face</span>
+                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Select Face</span>
                   <div className="grid grid-cols-6 gap-2">
                     {PRESET_AVATARS.map((avatarItem, idx) => (
                       <button
                         type="button"
                         key={idx}
                         onClick={() => setSelectedAvatarUrl(avatarItem)}
-                        className={`relative w-9 h-9 rounded-full overflow-hidden border-2 transition-all active:scale-90 ${
-                          selectedAvatarUrl === avatarItem ? "border-sky-500 scale-105" : "border-transparent opacity-60 hover:opacity-100"
+                        className={`relative w-9 h-9 rounded-full overflow-hidden border-2 transition-all duration-200 hover:scale-110 active:scale-90 shadow-sm ${
+                          selectedAvatarUrl === avatarItem 
+                            ? "border-sky-500 ring-2 ring-sky-500/20 scale-105" 
+                            : "border-transparent opacity-70 hover:opacity-100"
                         }`}
                       >
                         <img src={avatarItem} className="w-full h-full object-cover" />
@@ -1733,56 +2421,47 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Username</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Username</label>
                   <input
                     type="text"
                     maxLength={18}
                     value={regUsername}
                     onChange={(e) => setRegUsername(e.target.value)}
                     placeholder="e.g. Ann"
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                      theme === "black"
-                        ? "bg-black border-neutral-900 text-white placeholder-slate-700 focus:border-sky-500/50"
-                        : isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-455 uppercase tracking-widest">Email Address</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Email Address</label>
                   <input
                     type="email"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="e.g. ann@gmail.com"
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                      theme === "black"
-                        ? "bg-black border-neutral-900 text-white placeholder-slate-700 focus:border-sky-500/50"
-                        : isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
+                    placeholder="e.g. ann@example.com"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
                   />
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Password</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
                   <input
                     type="password"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Choose account password..."
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                      theme === "black"
-                        ? "bg-black border-neutral-900 text-white placeholder-slate-700 focus:border-sky-500/50"
-                        : isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
+                    placeholder="Create a password"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
                     }`}
                     required
                   />
@@ -1790,85 +2469,66 @@ export default function Home() {
 
                 <button
                   type="submit"
-                  disabled={!regUsername.trim() || !regEmail.trim() || !regPassword}
-                  className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 font-bold text-white rounded-xl shadow-md active:scale-95 transition-all text-xs mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:brightness-110 font-bold text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm mt-2 cursor-pointer"
                 >
-                  Register & Join
+                  Create Account
                 </button>
-              </form>
-            ) : (
-              <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Username or Email</label>
-                  <input
-                    type="text"
-                    value={loginIdentifier}
-                    onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="Enter username or email..."
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                      theme === "black"
-                        ? "bg-black border-neutral-900 text-white placeholder-slate-700 focus:border-sky-500/50"
-                        : isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
-                    }`}
-                    required
-                  />
-                </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest">Password</label>
-                  <input
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Enter account password..."
-                    className={`w-full px-4 py-2.5 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                      theme === "black"
-                        ? "bg-black border-neutral-900 text-white placeholder-slate-700 focus:border-sky-500/50"
-                        : isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
-                    }`}
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={!loginIdentifier.trim() || !loginPassword}
-                  className="w-full py-2.5 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 font-bold text-white rounded-xl shadow-md active:scale-95 transition-all text-xs mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Log In & Join
-                </button>
+                <p className="text-[11.5px] text-slate-450 text-center mt-3 font-semibold">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("login");
+                      setAuthError(null);
+                    }}
+                    className="text-sky-500 hover:underline font-bold"
+                  >
+                    Sign In
+                  </button>
+                </p>
               </form>
             )}
-
-            <div className="flex items-center my-3.5 w-full">
-              <div className={`flex-grow border-t ${theme === "black" ? "border-neutral-900" : isDark ? "border-slate-800" : "border-slate-200"}`}></div>
-              <span className={`mx-3 text-[10px] font-bold uppercase tracking-wider ${theme === "black" ? "text-slate-700" : isDark ? "text-slate-600" : "text-slate-400"}`}>or</span>
-              <div className={`flex-grow border-t ${theme === "black" ? "border-neutral-900" : isDark ? "border-slate-800" : "border-slate-200"}`}></div>
+            {/* Connection settings toggle */}
+            <div className="w-full mt-5 pt-4 border-t border-slate-100/5 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setShowServerSettings(!showServerSettings)}
+                className="text-[10px] font-extrabold text-slate-500 hover:text-slate-350 uppercase tracking-widest flex items-center justify-center gap-1 cursor-pointer transition-colors"
+              >
+                <svg className="w-3.5 h-3.5 animate-spin-slow" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Connection Settings</span>
+              </button>
+              {showServerSettings && (
+                <div className="w-full flex flex-col gap-1.5 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-900 animate-chat-bubble mt-1">
+                  <label className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest">Backend Server URL</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={customApiBase}
+                      onChange={(e) => saveCustomApiBase(e.target.value)}
+                      placeholder={`Default: ${API_BASE}`}
+                      className="flex-1 bg-slate-900 border border-slate-800 text-xs px-3 py-1.5 rounded-xl text-white outline-none placeholder-slate-600 focus:border-sky-500/50"
+                    />
+                    {customApiBase && (
+                      <button
+                        type="button"
+                        onClick={() => saveCustomApiBase("")}
+                        className="px-2.5 py-1.5 bg-slate-900 border border-slate-800 text-[10px] font-bold rounded-xl text-slate-400 hover:text-white"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[8.5px] text-slate-500 leading-normal mt-1">
+                    If accessing this app via localtunnel/ngrok, paste the backend's tunnel URL above to route calls correctly.
+                  </p>
+                </div>
+              )}
             </div>
-
-            <button
-              type="button"
-              onClick={() => setIsGoogleModalOpen(true)}
-              className={`w-full py-2.5 border rounded-xl outline-none text-xs font-bold shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 cursor-pointer ${
-                theme === "black"
-                  ? "bg-black border-neutral-900 hover:bg-[#080808] text-slate-200"
-                  : isDark
-                    ? "bg-slate-900 border-slate-800 hover:bg-slate-850 text-slate-200"
-                    : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
-              }`}
-            >
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-              </svg>
-              Sign in with Google
-            </button>
           </div>
         </div>
       ) : (
@@ -1878,7 +2538,7 @@ export default function Home() {
           {/* COLUMN 1: LEFT SIDEBAR MESSAGES LIST (350px) */}
           <section 
             className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 ${
-              isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
             } ${
               activeContact 
                 ? "hidden md:flex w-[350px] h-full" 
@@ -1887,7 +2547,7 @@ export default function Home() {
           >
             <div className="p-4 flex flex-col gap-3 border-b border-slate-100/10">
               <div className={`w-full h-[36px] border rounded-lg flex items-center px-3 gap-2 ${
-                isDark ? "bg-slate-950 border-slate-850" : "bg-slate-50 border-slate-200"
+                isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-200"
               }`}>
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
@@ -1931,6 +2591,7 @@ export default function Home() {
                   const isTyping = typingUsers[user.username];
                   const isActive = activeContact?.username === user.username;
                   const lastMsg = getLastMessage(user.username);
+                  const rel = getChatRelationship(user.username);
                   
                   const hasMockBadge = (user.username === "Paul Osmand" || user.username === "Edward Davis") && !lastMsg;
 
@@ -1938,10 +2599,12 @@ export default function Home() {
                     <button
                       key={user.username}
                       onClick={() => setActiveContact(user)}
-                      className={`w-full p-3.5 flex items-center gap-3.5 rounded-xl hover-scale relative ${
+                      className={`w-full p-3 flex items-center gap-3.5 rounded-2xl relative transition-all duration-300 hover:translate-x-1 ${
                         isActive
-                          ? isDark ? "bg-slate-800" : "bg-slate-100"
-                          : isDark ? "hover:bg-slate-800/40" : "hover:bg-slate-50"
+                          ? isDark ? "bg-slate-800/80 border border-slate-700/50 shadow-md shadow-black/10" 
+                            : "bg-slate-100 border border-slate-200/80 shadow-sm"
+                          : isDark ? "border border-transparent hover:bg-slate-900/40 hover:border-slate-850/50" 
+                            : "border border-transparent hover:bg-slate-50/80 hover:border-slate-100"
                       }`}
                     >
                       <div className="relative flex-shrink-0">
@@ -1979,22 +2642,32 @@ export default function Home() {
                           )}
                         </div>
                         
-                        <p className="text-[11.5px] text-slate-500 truncate leading-snug">
+                        <div className="text-[11.5px] text-slate-500 truncate leading-snug">
                           {isTyping ? (
                             <span className="text-purple-500 font-bold animate-pulse">typing...</span>
+                          ) : rel && rel.status === 'pending' ? (
+                            rel.sender.toLowerCase() === currentUser.username.toLowerCase()
+                              ? <span className="text-amber-500 font-bold">Request Pending ✉️</span>
+                              : <span className="text-sky-500 font-bold animate-pulse">Wants to Chat! ✉️</span>
+                          ) : rel && rel.status === 'declined' ? (
+                            <span className="text-rose-500 font-bold">Request Declined ❌</span>
                           ) : lastMsg ? (
-                            lastMsg.text || "📷 Photo attachment"
+                            <span>{lastMsg.text || "📷 Photo attachment"}</span>
                           ) : (
-                            user.statusText || "Start DM"
+                            <span>{user.statusText || "Start DM"}</span>
                           )}
-                        </p>
+                        </div>
                       </div>
 
-                      {hasMockBadge && (
+                      {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
+                        <span className="absolute right-4 w-7 h-4.5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500 text-[9px] font-black text-white flex items-center justify-center select-none shadow animate-pulse">
+                          REQ
+                        </span>
+                      ) : hasMockBadge ? (
                         <span className="absolute right-4 w-4.5 h-4.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-[10px] font-black text-white flex items-center justify-center select-none shadow">
                           1
                         </span>
-                      )}
+                      ) : null}
                     </button>
                   );
                 })
@@ -2005,7 +2678,7 @@ export default function Home() {
           {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM */}
           <main 
             className={`flex-1 flex flex-col border-r transition-all duration-300 ${
-              isDark ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200"
+              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
             } ${
               !activeContact 
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
@@ -2015,8 +2688,8 @@ export default function Home() {
             {activeContact ? (
               <>
                 {/* Active Chat Header */}
-                <header className={`h-[60px] px-6 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
-                  isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                <header className={`h-[60px] px-6 border-b flex items-center justify-between flex-shrink-0 z-40 select-none backdrop-blur-md ${
+                  isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
                 }`}>
                   <div className="flex items-center gap-3">
                     <button 
@@ -2048,21 +2721,49 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <button 
-                    onClick={() => setIsDetailPaneOpen((prev) => !prev)}
-                    className={`w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 ${
-                      isDetailPaneOpen ? "bg-slate-100/10 text-slate-300" : ""
-                    }`}
-                  >
-                    <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 111.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {/* Audio Call Button */}
+                    {isAccepted && (
+                      <button
+                        onClick={() => startCall("audio")}
+                        title="Audio Call"
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer"
+                      >
+                        <svg className="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                        </svg>
+                      </button>
+                    )}
+
+                    {/* Video Call Button */}
+                    {isAccepted && (
+                      <button
+                        onClick={() => startCall("video")}
+                        title="Video Call"
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer"
+                      >
+                        <svg className="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                      </button>
+                    )}
+
+                    <button 
+                      onClick={() => setIsDetailPaneOpen((prev) => !prev)}
+                      className={`w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer ${
+                        isDetailPaneOpen ? "bg-slate-100/10 text-slate-300" : ""
+                      }`}
+                    >
+                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 111.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                      </svg>
+                    </button>
+                  </div>
                 </header>
 
                 {/* Message feeds stream */}
                 <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-5 custom-scrollbar flex flex-col ${
-                  isDark ? "bg-slate-950" : "bg-white"
+                  isDark ? "bg-black" : "bg-white"
                 }`}>
                   
                   {/* Sync info banner */}
@@ -2097,12 +2798,11 @@ export default function Home() {
 
                         <div className="flex flex-col max-w-[70%]">
                           <div
-                            className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed shadow-sm break-words relative ${
+                            className={`px-4 py-2.5 rounded-[20px] text-[14px] leading-relaxed shadow-md break-words relative transition-all ${
                               isMe
-                                ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-br-sm bubble-shadow-me"
-                                : isDark 
-                                  ? "bg-slate-800 text-slate-100 rounded-bl-sm bubble-shadow-them"
-                                  : "bg-slate-100 text-slate-800 rounded-bl-sm bubble-shadow-them"
+                                ? "bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white rounded-br-xs shadow-blue-500/10 border border-blue-500/20"
+                                : isDark ? "bg-slate-900/90 text-slate-100 rounded-bl-xs border border-slate-800/80 shadow-black/10"
+                                  : "bg-slate-100/90 text-slate-800 rounded-bl-xs border border-slate-200/50 shadow-slate-100/50"
                             }`}
                           >
                             {msg.text && <p className="font-normal">{msg.text}</p>}
@@ -2154,123 +2854,184 @@ export default function Home() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Footer input box */}
-                <footer className={`p-4 border-t flex items-center gap-3 select-none flex-shrink-0 ${
-                  isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-                }`}>
-                  <button 
-                    onClick={handleSendMockImage}
-                    title="Send photography media"
-                    className="p-1.5 rounded-full text-slate-500 hover:text-slate-850 hover:bg-slate-100/10 transition-all active:scale-90"
-                  >
-                    <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                    </svg>
-                  </button>
+                {/* Floating input dock or Message Request Panel */}
+                {isAccepted ? (
+                  <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
+                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg ${
+                      isDark ? "bg-slate-905/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
+                        : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
+                    }`}>
+                      <button 
+                        onClick={handleSendMockImage}
+                        title="Send photography media"
+                        className="p-1.5 rounded-full text-slate-500 hover:text-sky-500 hover:bg-slate-100/10 transition-all active:scale-90 cursor-pointer"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                        </svg>
+                      </button>
 
-                  {/* Emoji Picker Popover Wrapper */}
-                  <div className="relative" ref={emojiPickerRef}>
-                    <button 
-                      onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
-                      title="Insert emoji"
-                      className={`p-1.5 rounded-full hover:bg-slate-100/10 transition-all active:scale-90 ${
-                        isEmojiPickerOpen ? "text-sky-500 bg-slate-100/10" : "text-slate-500 hover:text-slate-850"
-                      }`}
-                    >
-                      <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
-                      </svg>
-                    </button>
+                      {/* Emoji Picker Popover Wrapper */}
+                      <div className="relative" ref={emojiPickerRef}>
+                        <button 
+                          onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                          title="Insert emoji"
+                          className={`p-1.5 rounded-full hover:bg-slate-100/10 transition-all active:scale-90 cursor-pointer ${
+                            isEmojiPickerOpen ? "text-sky-500 bg-slate-100/10" : "text-slate-500 hover:text-sky-500"
+                          }`}
+                        >
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
+                          </svg>
+                        </button>
 
-                    {isEmojiPickerOpen && (
-                      <div className={`absolute bottom-[52px] left-0 w-[270px] border rounded-2xl p-3 shadow-xl flex flex-col z-50 animate-chat-bubble select-none ${
-                        isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-                      }`}>
-                        <div className="flex justify-between items-center border-b border-slate-100/10 pb-2 mb-2">
-                          {EMOJI_CATEGORIES.map((cat) => (
-                            <button
-                              type="button"
-                              key={cat.name}
-                              onClick={() => setActiveEmojiCategory(cat.name)}
-                              title={cat.name}
-                              className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95 ${
-                                activeEmojiCategory === cat.name ? "bg-slate-100/10 text-slate-300" : "opacity-50 hover:opacity-100"
-                              }`}
-                            >
-                              {cat.icon}
-                            </button>
-                          ))}
-                        </div>
+                        {isEmojiPickerOpen && (
+                          <div className={`absolute bottom-[52px] left-0 w-[270px] border rounded-2xl p-3 shadow-xl flex flex-col z-50 animate-chat-bubble select-none ${
+                            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                          }`}>
+                            <div className="flex justify-between items-center border-b border-slate-150/10 pb-2 mb-2">
+                              {EMOJI_CATEGORIES.map((cat) => (
+                                <button
+                                  type="button"
+                                  key={cat.name}
+                                  onClick={() => setActiveEmojiCategory(cat.name)}
+                                  title={cat.name}
+                                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95 cursor-pointer ${
+                                    activeEmojiCategory === cat.name ? "bg-slate-100/10 text-slate-350" : "opacity-50 hover:opacity-100"
+                                  }`}
+                                >
+                                  {cat.icon}
+                                </button>
+                              ))}
+                            </div>
 
-                        <div className="grid grid-cols-7 gap-1.5 overflow-y-auto max-h-[140px] custom-scrollbar p-1">
-                          {EMOJI_CATEGORIES.find((c) => c.name === activeEmojiCategory)?.list.map((emoji) => (
-                            <button
-                              type="button"
-                              key={emoji}
-                              onClick={() => setInputText((prev) => prev + emoji)}
-                              className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-slate-100/10 active:scale-90 rounded-lg transition-all"
-                            >
-                              {emoji}
-                            </button>
-                          ))}
-                        </div>
+                            <div className="grid grid-cols-7 gap-1.5 overflow-y-auto max-h-[140px] custom-scrollbar p-1">
+                              {EMOJI_CATEGORIES.find((c) => c.name === activeEmojiCategory)?.list.map((emoji) => (
+                                <button
+                                  type="button"
+                                  key={emoji}
+                                  onClick={() => setInputText((prev) => prev + emoji)}
+                                  className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-slate-100/10 active:scale-90 rounded-lg transition-all cursor-pointer"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    )}
+
+                      <div className="flex-1 relative">
+                        <input
+                          type="text"
+                          value={inputText}
+                          onChange={(e) => {
+                            setInputText(e.target.value);
+                            handleUserTyping(e.target.value.length);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              handleSendMessage();
+                            }
+                          }}
+                          placeholder="Type a message..."
+                          className={`w-full pl-4 pr-12 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                            isDark ? "bg-[#04060a] border-slate-850 text-white placeholder-slate-500 focus:border-sky-500/50 focus:ring-sky-500/5" 
+                              : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50 focus:ring-sky-500/5"
+                          }`}
+                        />
+                        <button
+                          onClick={() => handleSendMessage()}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 hover:brightness-110 text-white flex items-center justify-center active:scale-90 transition-transform shadow shadow-sky-500/10 cursor-pointer"
+                          disabled={!inputText.trim()}
+                        >
+                          <svg className="w-[15px] h-[15px] rotate-45 -translate-x-[0.5px] stroke-[2.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
+                    <div className={`p-6 rounded-[28px] border flex flex-col items-center justify-center text-center gap-4 shadow-lg ${
+                      isDark ? "bg-[#080B12]/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
+                        : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
+                    }`}>
+                      {activeRelationship === null && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-slate-400">
+                            You need to send a message request to start chatting with {activeContact.username}.
+                          </p>
+                          <button
+                            onClick={() => sendChatRequest(activeContact.username)}
+                            className="px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-sky-500/10 active:scale-95 transition-all cursor-pointer"
+                          >
+                            Send Message Request
+                          </button>
+                        </div>
+                      )}
 
-                  <div className={`flex-1 h-[44px] px-4 border transition-colors rounded-full flex items-center ${
-                    isDark ? "bg-slate-950 border-slate-800 focus-within:border-slate-700" : "bg-slate-50 border-slate-200 focus-within:border-slate-300"
-                  }`}>
-                    <input
-                      type="text"
-                      value={inputText}
-                      onChange={(e) => {
-                        setInputText(e.target.value);
-                        handleUserTyping(e.target.value.length);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      placeholder="Message..."
-                      className={`bg-transparent text-sm w-full outline-none font-normal ${
-                        isDark ? "text-slate-100 placeholder-slate-600" : "text-slate-800 placeholder-slate-400"
-                      }`}
-                    />
+                      {activeRelationship !== null && activeRelationship.status === "pending" && (
+                        <>
+                          {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase() ? (
+                            <div className="flex flex-col items-center gap-2">
+                              <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                              </span>
+                              <p className="text-xs font-bold text-amber-550">
+                                Message request pending approval...
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-slate-400">
+                                {activeContact.username} wants to send you messages. Do you accept?
+                              </p>
+                              <div className="flex justify-center gap-3">
+                                <button
+                                  onClick={() => updateChatRequest(activeRelationship.id, "accepted")}
+                                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-emerald-500/10 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Accept
+                                </button>
+                                <button
+                                  onClick={() => updateChatRequest(activeRelationship.id, "declined")}
+                                  className="px-6 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-rose-500/10 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Decline
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      {activeRelationship !== null && activeRelationship.status === "declined" && (
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold text-rose-500">
+                            {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase()
+                              ? "Your request was declined by the recipient."
+                              : "You declined this message request."}
+                          </p>
+                          <button
+                            onClick={() => sendChatRequest(activeContact.username)}
+                            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-2xl transition-all cursor-pointer"
+                          >
+                            {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase()
+                              ? "Try Resending Request"
+                              : "Change Mind: Accept Request"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  <button 
-                    onClick={() => {
-                      setInputText("Listening...");
-                      setTimeout(() => setInputText("I'm skating tonight!"), 1500);
-                    }}
-                    className="p-1.5 rounded-full text-slate-500 hover:text-slate-850 hover:bg-slate-100/10 transition-all active:scale-90"
-                  >
-                    <svg className="w-6.5 h-6.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
-                    </svg>
-                  </button>
-
-                  <button
-                    onClick={() => handleSendMessage()}
-                    className={`w-[40px] h-[40px] rounded-full flex items-center justify-center transition-all ${
-                      inputText.trim()
-                        ? "insta-send-gradient hover:opacity-90 active:scale-90 text-white shadow-md"
-                        : "bg-slate-100/10 text-slate-550 cursor-not-allowed"
-                    }`}
-                    disabled={!inputText.trim()}
-                  >
-                    <svg className="w-[16px] h-[16px] rotate-45 -translate-x-[1px] stroke-[2.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                    </svg>
-                  </button>
-                </footer>
+                )}
               </>
             ) : (
               <div className={`flex-1 flex flex-col items-center justify-center text-center p-8 select-none ${
-                isDark ? "bg-slate-950" : "bg-slate-50"
+                isDark ? "bg-black" : "bg-slate-50"
               }`}>
                 <div className={`w-20 h-20 rounded-full border flex items-center justify-center text-slate-400 mb-4 shadow-sm ${
                   isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
@@ -2290,21 +3051,26 @@ export default function Home() {
           {/* COLUMN 3: RIGHT PANEL - CONTACT DETAIL INFO DISPLAY (320px) */}
           {activeContact && isDetailPaneOpen && (
             <aside 
-              className={`w-full lg:w-[320px] border-l flex flex-col items-center p-6 text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none ${
-                isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+              className={`w-full lg:w-[320px] border-l flex flex-col items-center text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none overflow-y-auto ${
+                isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
               }`}
             >
-              <button 
-                onClick={() => setIsDetailPaneOpen(false)}
-                className="lg:hidden absolute top-4 right-4 p-2 text-slate-450 hover:text-slate-800"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+              {/* Cover Banner Cover */}
+              <div className="w-full h-24 bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-purple-500/20 relative flex-shrink-0">
+                <button 
+                  onClick={() => setIsDetailPaneOpen(false)}
+                  className="lg:hidden absolute top-4 right-4 p-2 bg-slate-900/60 text-white rounded-full backdrop-blur-sm hover:bg-slate-900 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-              <div className="relative mt-8 mb-5 select-none">
-                <div className="w-[120px] h-[120px] rounded-full overflow-hidden border border-slate-200 p-[3px] shadow-sm">
+              {/* Profile Avatar */}
+              <div className="relative -mt-12 mb-4 select-none flex-shrink-0 z-10">
+                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-600 opacity-60 blur-xs" />
+                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-950 p-[1.5px] shadow-lg relative bg-slate-900">
                   <img
                     src={activeContact.avatarUrl}
                     alt={activeContact.username}
@@ -2313,36 +3079,58 @@ export default function Home() {
                 </div>
               </div>
 
-              <h2 className={`text-[18px] font-black tracking-wide mb-0.5 ${isDark ? "text-slate-200" : "text-slate-800"}`}>
-                {activeContact.username.toUpperCase()}
-              </h2>
-              <p className="text-[11px] font-extrabold tracking-widest text-slate-450 uppercase mb-4">
-                {activeContact.category || "MEMBER"}
-              </p>
+              <div className="px-6 pb-6 flex-1 flex flex-col items-center">
+                <h2 className={`text-lg font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                  {activeContact.username.toUpperCase()}
+                </h2>
+                
+                <span className="text-[10px] font-extrabold tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-full uppercase mb-5">
+                  {activeContact.category || "MEMBER"}
+                </span>
 
-              <p className="text-[12px] leading-relaxed text-slate-500 max-w-[240px] mb-6 font-medium">
-                {activeContact.bio || "No profile biography available yet."}
-              </p>
-
-              <button className="px-5 py-2.5 rounded-lg bg-sky-500 hover:bg-sky-400 font-bold text-white active:scale-95 transition-all text-xs tracking-wide shadow-md">
-                VIEW PROFILE
-              </button>
-
-              <div className="flex gap-4 mt-auto pt-8 select-none">
-                <button className={`w-[52px] h-[52px] rounded-full text-slate-500 flex items-center justify-center active:scale-90 transition-all shadow-sm ${
-                  isDark ? "bg-slate-850 hover:bg-slate-800" : "bg-slate-100 hover:bg-slate-200"
+                <div className={`w-full rounded-2xl p-4 border text-left mb-6 ${
+                  isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-150"
                 }`}>
-                  <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                  </svg>
+                  <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Biography</h4>
+                  <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-655"}`}>
+                    {activeContact.bio || "No biography provided by this user."}
+                  </p>
+                </div>
+
+                <button className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:brightness-110 hover:shadow-cyan-500/20 text-white font-extrabold text-xs tracking-wider shadow-lg shadow-blue-500/20 active:scale-95 transition-all uppercase cursor-pointer">
+                  View Profile Details
                 </button>
-                <button className={`w-[52px] h-[52px] rounded-full text-slate-500 flex items-center justify-center active:scale-90 transition-all shadow-sm ${
-                  isDark ? "bg-slate-850 hover:bg-slate-800" : "bg-slate-100 hover:bg-slate-200"
-                }`}>
-                  <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                  </svg>
-                </button>
+
+                <div className="flex gap-4 mt-8 select-none">
+                  {isAccepted && (
+                    <button
+                      onClick={() => startCall("video")}
+                      title="Video Call"
+                      className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
+                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
+                      }`}
+                    >
+                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    </button>
+                  )}
+                  {isAccepted && (
+                    <button
+                      onClick={() => startCall("audio")}
+                      title="Voice Call"
+                      className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
+                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                          : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
+                      }`}
+                    >
+                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
             </aside>
           )}
@@ -2350,143 +3138,278 @@ export default function Home() {
         </div>
       )}
 
-      {isGoogleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className={`w-full max-w-[400px] mx-4 rounded-2xl shadow-2xl p-6 border transition-all ${
-            isDark 
-              ? "bg-slate-950 border-slate-800 text-slate-100" 
-              : "bg-white border-slate-200 text-slate-850"
-          }`}>
-            {/* Modal Header */}
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                </svg>
-                <span className="font-bold text-sm">Sign in with Google</span>
+      {/* Call Screen Overlay Modal */}
+      {callState !== "idle" && (
+        <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-slate-950 text-white animate-fade-in">
+          {/* Background glow or subtle glassmorphism */}
+          <div className="absolute inset-0 bg-radial-gradient from-slate-900 via-slate-950 to-black pointer-events-none opacity-80" />
+
+          {/* Main container */}
+          <div className="relative z-10 w-full max-w-4xl h-full md:max-h-[85vh] max-h-screen md:rounded-3xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden">
+            
+            {/* Call Header info */}
+            <div className="p-4 md:p-6 flex items-center justify-between border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                </span>
+                <span className="text-sm font-bold tracking-wider uppercase text-slate-400">
+                  {callType === "video" ? "Video Call" : "Voice Call"} — {callState.toUpperCase()}
+                </span>
               </div>
-              <button 
-                onClick={() => !isSigningInWithGoogle && setIsGoogleModalOpen(false)}
-                className={`p-1 rounded-full hover:bg-slate-100/10 cursor-pointer ${isSigningInWithGoogle ? "opacity-30 cursor-not-allowed" : ""}`}
-                disabled={isSigningInWithGoogle}
-              >
-                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+
+              <div className="text-xs bg-slate-800/80 px-3 py-1.5 rounded-full font-mono font-bold tracking-wide">
+                {currentTime}
+              </div>
             </div>
 
-            {/* Modal Body */}
-            {isSigningInWithGoogle ? (
-              <div className="flex flex-col items-center justify-center py-10 gap-4">
-                <div className="w-10 h-10 border-4 border-sky-500/20 border-t-sky-500 rounded-full animate-spin"></div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold">Signing in...</p>
-                  <p className="text-xs text-slate-400 mt-1">Connecting to Google services</p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-xs text-slate-450">Choose a Google Account to continue to ChatGroup.</p>
-                
-                {/* Mock Accounts List */}
-                <div className="space-y-2">
-                  {[
-                    {
-                      name: "Krupali Bathani",
-                      email: "krupali.bathani@gmail.com",
-                      avatar: PRESET_AVATARS[0]
-                    },
-                    {
-                      name: "Om Gadhiya",
-                      email: "omgadhiya97@gmail.com",
-                      avatar: "/om_gadhiya.png"
-                    },
-                    {
-                      name: "David Williams",
-                      email: "david.williams@gmail.com",
-                      avatar: "/david_williams.png"
-                    }
-                  ].map((acc, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleGoogleSignIn(acc.name, acc.email, acc.avatar)}
-                      className={`w-full p-3 border rounded-xl flex items-center gap-3 transition-all active:scale-[0.98] cursor-pointer text-left ${
-                        isDark 
-                          ? "border-slate-800 hover:bg-slate-900 bg-slate-950" 
-                          : "border-slate-200 hover:bg-slate-50 bg-white"
-                      }`}
-                    >
-                      <div className="w-9 h-9 rounded-full overflow-hidden flex-shrink-0 bg-slate-200">
-                        {acc.avatar.startsWith("/") ? (
-                          <img src={acc.avatar} className="w-full h-full object-cover" onError={(e) => {
-                            e.currentTarget.src = PRESET_AVATARS[index];
-                          }} />
-                        ) : (
-                          <img src={acc.avatar} className="w-full h-full object-cover" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold truncate">{acc.name}</p>
-                        <p className="text-xs text-slate-400 truncate">{acc.email}</p>
-                      </div>
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Separator / Custom Email option */}
-                <div className="flex items-center my-3 w-full">
-                  <div className={`flex-grow border-t ${isDark ? "border-slate-800" : "border-slate-200"}`}></div>
-                  <span className={`mx-3 text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-600" : "text-slate-400"}`}>or</span>
-                  <div className={`flex-grow border-t ${isDark ? "border-slate-800" : "border-slate-200"}`}></div>
-                </div>
-
-                {/* Custom Google Account Input */}
-                <form 
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    if (!googleCustomEmail.trim()) return;
-                    const email = googleCustomEmail.trim().toLowerCase();
-                    const prefix = email.split("@")[0];
-                    const formattedName = prefix
-                      .split(/[\._\-]+/)
-                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(" ");
-                    const randomAvatar = PRESET_AVATARS[Math.floor(Math.random() * PRESET_AVATARS.length)];
-                    handleGoogleSignIn(formattedName, email, randomAvatar);
-                  }}
-                  className="space-y-3"
-                >
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Use custom email</label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. yourname@gmail.com"
-                      value={googleCustomEmail}
-                      onChange={(e) => setGoogleCustomEmail(e.target.value)}
-                      className={`w-full px-4 py-2 border rounded-xl outline-none text-xs font-semibold shadow-sm transition-colors ${
-                        isDark 
-                          ? "bg-slate-900 border-slate-800 text-white placeholder-slate-650 focus:border-sky-500/50" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50"
-                      }`}
-                    />
+            {/* Call Body: Streams or Ringing profile */}
+            <div className="flex-1 flex flex-col md:flex-row items-center justify-center p-3 md:p-6 gap-4 md:gap-6 relative">
+              
+              {/* If RINGING (receiving a call) or CALLING (outgoing) */}
+              {(callState === "calling" || callState === "ringing") && (
+                <div className="flex flex-col items-center text-center space-y-6 animate-pulse">
+                  <div className="relative">
+                    <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-30 blur-md animate-pulse" />
+                    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-slate-850 shadow-xl relative bg-slate-800 p-1">
+                      <img
+                        src={callState === "calling" ? activeContact?.avatarUrl : PRESET_AVATARS[0]}
+                        alt="Calling Avatar"
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
                   </div>
+
+                  <div>
+                    <h2 className="text-2xl font-black tracking-wide">
+                      {callState === "calling" ? calleeName.toUpperCase() : callerName.toUpperCase()}
+                    </h2>
+                    <p className="text-sm text-slate-450 mt-2">
+                      {callState === "calling" ? "Calling..." : "Incoming Call..."}
+                    </p>
+                  </div>
+
+                  {callState === "ringing" && (
+                    <div className="flex gap-4 mt-4 select-none">
+                      <button
+                        onClick={acceptCall}
+                        className="px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                      >
+                        <Check className="w-4 h-4 stroke-[3]" /> Accept
+                      </button>
+                      <button
+                        onClick={declineCall}
+                        className="px-6 py-3 rounded-full bg-rose-500 hover:bg-rose-400 text-white font-extrabold text-sm shadow-lg shadow-rose-500/20 active:scale-95 transition-all flex items-center gap-2 cursor-pointer"
+                      >
+                        <svg className="w-4 h-4 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg> Decline
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* If CONNECTED (active streams) */}
+              {callState === "connected" && (
+                <div className="w-full h-full relative flex items-center justify-center bg-slate-950 rounded-2xl overflow-hidden border border-slate-800">
+                  {callType === "video" ? (
+                    <>
+                      {/* Remote video (full stream) */}
+                      <video
+                        ref={remoteVideoRef}
+                        autoPlay
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Local video (picture-in-picture) */}
+                      {!isCameraOff && (
+                        <div className="absolute bottom-4 right-4 w-32 sm:w-44 aspect-video bg-slate-900 border-2 border-white/20 rounded-xl overflow-hidden shadow-2xl z-20">
+                          <video
+                            ref={localVideoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+
+                      {/* Floating Vertical Sidebar Call Controls */}
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-30 bg-slate-950/60 backdrop-blur-md p-2.5 rounded-2xl border border-slate-800 shadow-2xl transition-all duration-300">
+                        {/* Mute Microphone Button */}
+                        <button
+                          onClick={toggleMute}
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                            isMicMuted 
+                              ? "bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30" 
+                              : "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border border-slate-800/80"
+                          }`}
+                          title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+                        >
+                          {isMicMuted ? (
+                            <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6v9a3 3 0 006 0v-9a3 3 0 00-6 0z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Camera Toggle Button */}
+                        <button
+                          onClick={toggleCamera}
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                            isCameraOff 
+                              ? "bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30" 
+                              : "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border border-slate-800/80"
+                          }`}
+                          title={isCameraOff ? "Turn Video On" : "Turn Video Off"}
+                        >
+                          {isCameraOff ? (
+                            <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M12 18.75h-9a2.25 2.25 0 01-2.25-2.25v-9A2.25 2.25 0 013 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25z" />
+                            </svg>
+                          )}
+                        </button>
+
+                        {/* Flip Camera Button */}
+                        <button
+                          onClick={flipCamera}
+                          disabled={videoDevices.length <= 1}
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-200 ${
+                            videoDevices.length > 1
+                              ? "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border-slate-800/80 cursor-pointer"
+                              : "bg-slate-950/40 text-slate-600 border-slate-900/50 cursor-not-allowed opacity-50"
+                          }`}
+                          title={videoDevices.length > 1 ? "Flip Camera" : "No other camera available"}
+                        >
+                          <RefreshCw className="w-5 h-5 text-emerald-400" />
+                        </button>
+
+                        {/* Hang Up Button */}
+                        <button
+                          onClick={() => handleEndCallRef.current(true)}
+                          className="w-11 h-11 rounded-xl flex items-center justify-center bg-rose-600 hover:bg-rose-500 text-white border border-rose-500/30 transition-all duration-200 cursor-pointer shadow-lg shadow-rose-600/30"
+                          title="Hang Up"
+                        >
+                          <svg className="w-5 h-5 rotate-[135deg] stroke-[3.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                          </svg>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    /* Voice call layout */
+                    <div className="flex flex-col items-center text-center space-y-6">
+                      <div className="relative">
+                        <div className="absolute -inset-4 rounded-full bg-emerald-500/20 opacity-70 blur-md animate-pulse" />
+                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xl bg-slate-800">
+                          <img
+                            src={activeContact?.avatarUrl}
+                            alt="Active voice avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-black tracking-wide text-emerald-400">Call Connected</h2>
+                        <p className="text-xs text-slate-400 mt-1.5 font-semibold">Ongoing audio communication...</p>
+                      </div>
+                      {/* Audio element for remote voice tracks */}
+                      <audio ref={remoteVideoRef as any} autoPlay />
+                    </div>
+                  )}
+                </div>
+              )}
+
+            </div>
+
+            {/* Call Footer controls */}
+            {!(callState === "connected" && callType === "video") && (
+              <div className="p-6 bg-slate-950/80 border-t border-slate-800 flex items-center justify-center gap-6 select-none">
+                <button
+                  onClick={toggleMute}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                    isMicMuted ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-slate-800 hover:bg-slate-700 text-white"
+                  }`}
+                  title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
+                >
+                  {isMicMuted ? (
+                    <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 9.75L19.5 12m0 0l2.25 2.25M19.5 12l2.25-2.25M19.5 12l-2.25 2.25m-10.5-6v9a3 3 0 006 0v-9a3 3 0 00-6 0z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z" />
+                    </svg>
+                  )}
+                </button>
+
+                {callType === "video" && callState === "connected" && (
                   <button
-                    type="submit"
-                    className="w-full py-2 bg-slate-800 hover:bg-slate-700 font-bold text-white rounded-xl shadow-md transition-all text-xs active:scale-95 cursor-pointer dark:bg-sky-600 dark:hover:bg-sky-500"
+                    onClick={toggleCamera}
+                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+                      isCameraOff ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-slate-800 hover:bg-slate-700 text-white"
+                    }`}
+                    title={isCameraOff ? "Turn Video On" : "Turn Video Off"}
                   >
-                    Continue
+                    {isCameraOff ? (
+                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M12 18.75h-9a2.25 2.25 0 01-2.25-2.25v-9A2.25 2.25 0 013 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25z" />
+                      </svg>
+                    )}
                   </button>
-                </form>
+                )}
+
+                {callType === "video" && callState === "connected" && videoDevices.length > 0 && (
+                  <div className="relative flex items-center bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-3 py-2 text-white text-xs font-semibold cursor-pointer max-w-[160px] sm:max-w-[200px] transition-all">
+                    <Camera className="w-4 h-4 text-emerald-400 shrink-0 mr-1.5" />
+                    <select
+                      value={selectedVideoDevice}
+                      onChange={(e) => changeVideoDevice(e.target.value)}
+                      className="bg-transparent border-none outline-none text-white text-xs font-semibold cursor-pointer pr-5 appearance-none w-full truncate"
+                      title="Change Camera"
+                    >
+                      {videoDevices.map((device) => (
+                        <option key={device.deviceId} value={device.deviceId} className="bg-slate-900 text-white">
+                          {device.label || `Camera ${videoDevices.indexOf(device) + 1}`}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-slate-400">
+                      <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                        <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => handleEndCallRef.current(true)}
+                  className="px-6 py-3 rounded-full bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-sm tracking-wide shadow-lg shadow-rose-600/30 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                  title="Hang Up"
+                >
+                  <svg className="w-5 h-5 rotate-[135deg] stroke-[3.2] animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                  </svg>
+                  Hang Up
+                </button>
               </div>
             )}
+
           </div>
         </div>
       )}

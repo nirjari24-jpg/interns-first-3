@@ -133,10 +133,6 @@ body {
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
   }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> a32a7b72543c7e13c3f3cd7f7659536682d4a383
 /* Ensure active/accent state colors are preserved by overriding general color rules */
 .light-theme .text-cyan-400 { color: #22d3ee !important; }
 .light-theme .text-cyan-500 { color: #06b6d4 !important; }
