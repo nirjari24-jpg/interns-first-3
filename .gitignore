@@ -1,0 +1,13 @@
+# Node modules
+node_modules/
+**/node_modules/
+
+# Next.js build output
+.next/
+**/.next/
+
+# Local env files
+.env*.local
+
+# VS Code settings that shouldn't be shared
+.vscode/

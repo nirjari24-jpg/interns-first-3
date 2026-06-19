@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 import User, { IUser } from './models/User';
 import Message, { IMessage } from './models/Message';
 import MessageRequest, { IMessageRequest } from './models/MessageRequest';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
 // Load environment variables
 dotenv.config();
@@ -93,12 +94,24 @@ const seedDatabase = async () => {
       await MessageRequest.deleteMany({}); // Also clear requests
     }
 
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      console.log('Seeding mock contacts with secure credentials into MongoDB...');
-      await User.insertMany(MOCK_CONTACTS);
-      console.log('Mock contacts successfully seeded!');
+    console.log('Synchronizing mock contacts with secure credentials into MongoDB...');
+    for (const contact of MOCK_CONTACTS) {
+      await User.findOneAndUpdate(
+        { email: contact.email.toLowerCase() },
+        {
+          $set: {
+            username: contact.username,
+            password: contact.password,
+            avatarUrl: contact.avatarUrl,
+            category: contact.category,
+            bio: contact.bio,
+            statusText: contact.statusText
+          }
+        },
+        { upsert: true, new: true }
+      );
     }
+    console.log('Mock contacts successfully synchronized!');
 
     // Seed message requests between mock contacts so they can message immediately
     const requestCount = await MessageRequest.countDocuments();
@@ -126,15 +139,32 @@ const seedDatabase = async () => {
 };
 
 // Database Connection
-mongoose.connect(MONGODB_URI)
-  .then(() => {
+const connectDB = async () => {
+  const dbUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/chatgroup';
+  
+  try {
+    console.log(`Connecting to MongoDB at: ${dbUri}`);
+    await mongoose.connect(dbUri);
     console.log('Connected to MongoDB Atlas / Database');
-    seedDatabase();
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error:', err.message);
-    console.log('Server is continuing, but DB operations will fail until connected.');
-  });
+    await seedDatabase();
+  } catch (err: any) {
+    console.warn('MongoDB connection error:', err.message);
+    console.log('Attempting to start an in-memory MongoDB server as fallback...');
+    
+    try {
+      const mongoMemoryServer = await MongoMemoryServer.create();
+      const inMemoryUri = mongoMemoryServer.getUri();
+      console.log(`Starting in-memory MongoDB server at: ${inMemoryUri}`);
+      await mongoose.connect(inMemoryUri);
+      console.log('Connected to In-Memory MongoDB Database!');
+      await seedDatabase();
+    } catch (memErr: any) {
+      console.error('Failed to start in-memory MongoDB fallback server:', memErr.message);
+    }
+  }
+};
+
+connectDB();
 
 // Socket.io Real-time Logic
 io.on('connection', (socket) => {
@@ -345,13 +375,21 @@ app.post('/api/users/login', async (req: Request, res: Response): Promise<any> =
   }
 
   try {
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const loginIdentifier = email.trim();
+    const user = await User.findOne({
+      $or: [
+        { email: loginIdentifier.toLowerCase() },
+        { username: { $regex: new RegExp(`^${loginIdentifier}$`, 'i') } }
+      ]
+    });
     if (!user) {
+      console.log(`[AUTH] Failed login: User not found for identifier "${loginIdentifier}"`);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     const isMatch = bcrypt.compareSync(password, user.password);
     if (!isMatch) {
+      console.log(`[AUTH] Failed login: Incorrect password "${password}" for user "${user.username}" (email: ${user.email})`);
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
