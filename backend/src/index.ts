@@ -107,45 +107,20 @@ const seedDatabase = async () => {
       await MessageRequest.deleteMany({}); // Also clear requests
     }
 
-    console.log('Synchronizing mock contacts with secure credentials into MongoDB...');
-    for (const contact of MOCK_CONTACTS) {
-      await User.findOneAndUpdate(
-        { email: contact.email.toLowerCase() },
-        {
-          $set: {
-            username: contact.username,
-            password: contact.password,
-            avatarUrl: contact.avatarUrl,
-            category: contact.category,
-            bio: contact.bio,
-            statusText: contact.statusText
-          }
-        },
-        { upsert: true, new: true }
-      );
-    }
-    console.log('Mock contacts successfully synchronized!');
+    console.log('Cleaning up mock contacts from MongoDB to show only registered users...');
+    const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
+    await User.deleteMany({ email: { $in: mockEmails } });
+    console.log('Mock contacts successfully removed!');
 
-    // Seed message requests between mock contacts so they can message immediately
-    const requestCount = await MessageRequest.countDocuments();
-    if (requestCount === 0) {
-      console.log('Seeding pre-accepted relationships for mock contacts...');
-      const requestsToSeed = [];
-      const usernames = MOCK_CONTACTS.map(c => c.username);
-      for (const sender of usernames) {
-        for (const recipient of usernames) {
-          if (sender !== recipient) {
-            requestsToSeed.push({
-              sender,
-              recipient,
-              status: 'accepted'
-            });
-          }
-        }
-      }
-      await MessageRequest.insertMany(requestsToSeed);
-      console.log('Relationships successfully seeded!');
-    }
+    // Clean up mock relationships
+    const mockUsernames = MOCK_CONTACTS.map(c => c.username);
+    await MessageRequest.deleteMany({
+      $or: [
+        { sender: { $in: mockUsernames } },
+        { recipient: { $in: mockUsernames } }
+      ]
+    });
+    console.log('Mock relationships successfully cleaned!');
   } catch (err) {
     console.error('Error seeding database:', err);
   }

@@ -151,6 +151,16 @@ export default function Home() {
       .then(users => {
         if (users && Array.isArray(users)) {
           setRegisteredUsers(users);
+          setActiveContact(prev => {
+            if (!prev) {
+              return users.length > 0 ? users[0] : null;
+            }
+            const exists = users.some(u => u.username === prev.username);
+            if (!exists) {
+              return users.length > 0 ? users[0] : null;
+            }
+            return prev;
+          });
         }
       })
       .catch(err => console.warn("Error fetching users:", err));
@@ -202,7 +212,7 @@ export default function Home() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(PRESET_AVATARS[0]);
-  const [registeredUsers, setRegisteredUsers] = useState<User[]>(MOCK_CONTACTS);
+  const [registeredUsers, setRegisteredUsers] = useState<User[]>([]);
 
   // Chat window states
   const [activeContact, setActiveContact] = useState<User | null>(null);
@@ -869,7 +879,6 @@ export default function Home() {
 
     fetchUsers();
     fetchRequests();
-    setActiveContact(MOCK_CONTACTS[0]);
   }, [API_BASE]);
 
   // Save theme changes to Local Cache
@@ -1534,7 +1543,7 @@ export default function Home() {
 
   function handleLogout() {
     setCurrentUser(null);
-    setActiveContact(MOCK_CONTACTS[0]);
+    setActiveContact(null);
     localStorage.removeItem("chatgroup_current_user");
     localStorage.removeItem("chatgroup_session_token");
   }
