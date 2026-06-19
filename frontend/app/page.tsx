@@ -961,6 +961,18 @@ export default function Home() {
       setTypingUsers((prev) => ({ ...prev, [data.from]: data.isTyping }));
     });
 
+    // Listen for read receipts
+    socket.on("messagesRead", (data: { reader: string }) => {
+      console.log("Read receipts received. User read our messages:", data.reader);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.recipient === data.reader && m.status !== "read"
+            ? { ...m, status: "read" }
+            : m
+        )
+      );
+    });
+
     // Listen for online/offline statuses
     socket.on("userStatus", (data: { username: string; status: "online" | "offline" }) => {
       setOnlineUsers((prev) => ({ ...prev, [data.username]: data.status }));

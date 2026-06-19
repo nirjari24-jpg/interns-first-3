@@ -584,6 +584,10 @@ app.put('/api/messages/read', async (req: Request, res: Response): Promise<any> 
       { sender, recipient, status: { $ne: 'read' } },
       { $set: { status: 'read' } }
     );
+    
+    // Notify the sender in real-time that recipient has read their messages
+    emitToUser(sender, 'messagesRead', { reader: recipient });
+    
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
