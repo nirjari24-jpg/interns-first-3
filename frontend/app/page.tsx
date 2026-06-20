@@ -731,6 +731,18 @@ export default function Home() {
   // Helper to resolve request status between current user and a contact
   const getChatRelationship = (contactUsername: string) => {
     if (!currentUser || !currentUser.username || !contactUsername) return null;
+    
+    // Automatically accept mock contacts
+    const isMock = MOCK_CONTACTS.some(c => c.username.toLowerCase() === contactUsername.toLowerCase());
+    if (isMock) {
+      return {
+        id: `mock-request-${contactUsername.toLowerCase()}`,
+        sender: currentUser.username,
+        recipient: contactUsername,
+        status: 'accepted' as const
+      };
+    }
+
     const match = messageRequests.find(r => 
       (r.sender.toLowerCase() === currentUser.username.toLowerCase() && r.recipient.toLowerCase() === contactUsername.toLowerCase()) ||
       (r.sender.toLowerCase() === contactUsername.toLowerCase() && r.recipient.toLowerCase() === currentUser.username.toLowerCase())
@@ -893,7 +905,7 @@ export default function Home() {
       fetchRequests();
     }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [API_BASE]);
 
   // Keep activeContactRef updated to prevent stale closures in socket events
   useEffect(() => {

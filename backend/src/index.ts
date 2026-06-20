@@ -107,20 +107,24 @@ const seedDatabase = async () => {
       await MessageRequest.deleteMany({}); // Also clear requests
     }
 
-    console.log('Cleaning up mock contacts from MongoDB to show only registered users...');
-    const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
-    await User.deleteMany({ email: { $in: mockEmails } });
-    console.log('Mock contacts successfully removed!');
-
-    // Clean up mock relationships
-    const mockUsernames = MOCK_CONTACTS.map(c => c.username);
-    await MessageRequest.deleteMany({
-      $or: [
-        { sender: { $in: mockUsernames } },
-        { recipient: { $in: mockUsernames } }
-      ]
-    });
-    console.log('Mock relationships successfully cleaned!');
+    console.log('Seeding mock contacts into MongoDB...');
+    for (const contact of MOCK_CONTACTS) {
+      const exists = await User.findOne({ email: contact.email.toLowerCase() });
+      if (!exists) {
+        const newUser = new User({
+          username: contact.username,
+          email: contact.email.toLowerCase(),
+          password: contact.password,
+          avatarUrl: contact.avatarUrl,
+          category: contact.category,
+          bio: contact.bio,
+          statusText: contact.statusText
+        });
+        await newUser.save();
+        console.log(`Seeded mock user: ${contact.username}`);
+      }
+    }
+    console.log('Mock contacts seeding completed successfully!');
   } catch (err) {
     console.error('Error seeding database:', err);
   }
