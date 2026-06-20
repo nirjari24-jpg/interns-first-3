@@ -95,38 +95,25 @@ const MOCK_CONTACTS = [
   }
 ];
 
-// Seed default users if database is empty or outdated
+// Clean up default users from database to show only registered users
 const seedDatabase = async () => {
   try {
-    // Check if we need to clean up old schema documents
-    const countWithoutEmail = await User.countDocuments({ $or: [{ email: { $exists: false } }, { password: { $exists: false } }] });
-    if (countWithoutEmail > 0) {
-      console.log('Detected old database schema. Clearing users collection to re-seed...');
-      await User.deleteMany({});
-      await Message.deleteMany({}); // Also clear old messages to keep a clean start
-      await MessageRequest.deleteMany({}); // Also clear requests
-    }
+    console.log('Cleaning up mock contacts from MongoDB to show only registered users...');
+    const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
+    await User.deleteMany({ email: { $in: mockEmails } });
+    console.log('Mock contacts successfully removed!');
 
-    console.log('Seeding mock contacts into MongoDB...');
-    for (const contact of MOCK_CONTACTS) {
-      const exists = await User.findOne({ email: contact.email.toLowerCase() });
-      if (!exists) {
-        const newUser = new User({
-          username: contact.username,
-          email: contact.email.toLowerCase(),
-          password: contact.password,
-          avatarUrl: contact.avatarUrl,
-          category: contact.category,
-          bio: contact.bio,
-          statusText: contact.statusText
-        });
-        await newUser.save();
-        console.log(`Seeded mock user: ${contact.username}`);
-      }
-    }
-    console.log('Mock contacts seeding completed successfully!');
+    // Clean up mock relationships
+    const mockUsernames = MOCK_CONTACTS.map(c => c.username);
+    await MessageRequest.deleteMany({
+      $or: [
+        { sender: { $in: mockUsernames } },
+        { recipient: { $in: mockUsernames } }
+      ]
+    });
+    console.log('Mock relationships successfully cleaned!');
   } catch (err) {
-    console.error('Error seeding database:', err);
+    console.error('Error cleaning up mock contacts:', err);
   }
 };
 
