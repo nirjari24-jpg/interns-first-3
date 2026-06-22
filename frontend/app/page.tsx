@@ -177,6 +177,7 @@ export default function Home() {
 
   // Navigation View State
   const [currentView, setCurrentView] = useState("chat"); // "chat" or "settings"
+  const [navView, setNavView] = useState<"chat" | "group" | "settings">("chat"); // left nav sidebar active view
 
   // Settings Theme
   const [theme, setTheme] = useState<"light" | "dark" | "black">("dark"); // "dark", "light", or "black"
@@ -189,6 +190,7 @@ export default function Home() {
   const [phone, setPhone] = useState("+91 97245 67890");
   const [bio, setBio] = useState("Education | Learning and Building Premium Web Apps 🚀");
   const [avatar, setAvatar] = useState("/om_gadhiya.png");
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
 
   // Password Change States
   const [currentPassword, setCurrentPassword] = useState("omgadhiya97@123");
@@ -775,6 +777,21 @@ export default function Home() {
       (r.sender.toLowerCase() === contactUsername.toLowerCase() && r.recipient.toLowerCase() === currentUser.username.toLowerCase())
     );
     return match || null;
+  };
+
+  const checkUsernameAvailability = async () => {
+    if (!username) { setUsernameAvailable(null); return; }
+    try {
+      const res = await fetch(`${API_BASE}/api/users/check-username?username=${encodeURIComponent(username)}`);
+      const data = await res.json();
+      setUsernameAvailable(data.available);
+      if (!data.available) {
+        // Username taken
+      }
+    } catch (e) {
+      console.warn("Username check failed", e);
+      setUsernameAvailable(null);
+    }
   };
 
   const sendChatRequest = (recipientUsername: string) => {
@@ -1801,10 +1818,9 @@ export default function Home() {
     if (hasSpecial) score++;
 
     switch (score) {
-      case 1: return { score: 25, label: "Weak ⚠️", color: "bg-rose-500/80", text: "text-rose-400" };
-      case 2: return { score: 50, label: "Medium ⚡", color: "bg-amber-500/80", text: "text-amber-400" };
-      case 3: return { score: 75, label: "Strong ✨", color: "bg-indigo-500/80", text: "text-indigo-400" };
-      case 4: return { score: 100, label: "Excellent 🔒", color: "bg-emerald-500/80", text: "text-emerald-400" };
+      case 1: return { score: 33, label: "Weak ⚠️", color: "bg-rose-500/80", text: "text-rose-400" };
+      case 2: return { score: 66, label: "Medium ⚡", color: "bg-amber-500/80", text: "text-amber-400" };
+      case 3: return { score: 100, label: "Strong ✨", color: "bg-emerald-500/80", text: "text-emerald-400" };
       default: return { score: 10, label: "Too Short ❌", color: "bg-rose-600/85", text: "text-rose-500" };
     }
   };
@@ -1814,16 +1830,16 @@ export default function Home() {
   // Save profile and sync to currentUser states
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (currentUser) {
-      // Backend /api/users/profile requires 'email' to identify the user
+      // Update profile with username, email and bio
       const reqBody = {
-        email: (currentUser as any).email || email,
-        avatarUrl: avatar,
+        username,
+        email,
         bio: bio.trim()
       };
 
-      fetch(`${API_BASE}/api/users/profile`, {
+      fetch(`${API_BASE}/api/users/update-profile`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reqBody)
@@ -1832,7 +1848,7 @@ export default function Home() {
       .then(updatedUser => {
         setCurrentUser(updatedUser);
         localStorage.setItem("chatgroup_current_user", JSON.stringify(updatedUser));
-        
+
         fetchUsers(updatedUser, false);
 
         if (channelRef.current) {
@@ -2135,47 +2151,6 @@ export default function Home() {
                       <span className="text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-bold">Information</span>
                     </div>
 
-                    <div className={`flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl border select-none transition-colors duration-500 ${
-                      isDark ? "bg-slate-950/40 border-slate-900/60" : "bg-slate-50 border-slate-200"
-                    }`}>
-                      <div className="relative group">
-                        <div className="absolute -inset-1.5 rounded-full bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-600 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
-                        
-                        <div className="w-[88px] h-[88px] rounded-full overflow-hidden border-[3px] border-slate-950 relative bg-slate-900">
-                          <img
-                            src={avatar}
-                            alt={name}
-                            className="object-cover w-full h-full"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={triggerAvatarUpload}
-                          className="absolute -bottom-1 -right-1 p-2 bg-slate-900 border border-slate-700/80 text-cyan-400 rounded-full shadow-lg hover:bg-slate-800 transition"
-                          title="Upload Avatar"
-                        >
-                          <Camera className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      <div className="text-center sm:text-left space-y-1">
-                        <h3 className="text-sm.5 font-extrabold">{name}</h3>
-                        <p className={`text-[11px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
-                          JPG, PNG allowed. Standard resolution will be automatically configured.
-                        </p>
-                        
-                        <div className="flex items-center justify-center sm:justify-start gap-3 mt-1.5">
-                          <button
-                            type="button"
-                            onClick={triggerAvatarUpload}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1.5 transition"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" /> Roll Random Photo
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2 text-left">
@@ -2199,13 +2174,14 @@ export default function Home() {
                             type="text"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
-                            className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
+                            onBlur={checkUsernameAvailability}
+                            className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"}`}
                             placeholder="Your username..."
                             required
                           />
+                          {usernameAvailable === false && (
+                            <p className="text-rose-400 text-xs mt-1">Username already taken</p>
+                          )}
                         </div>
                       </div>
 
@@ -2224,26 +2200,6 @@ export default function Home() {
                                 : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
                             }`}
                             placeholder="your.email@domain.com"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Phone Number</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                            <Phone className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="text"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
-                            placeholder="Your phone number..."
                             required
                           />
                         </div>
@@ -2319,10 +2275,7 @@ export default function Home() {
                             type={showNewPassword ? "text" : "password"}
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
-                            className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
+                            className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"}`}
                             placeholder="Type new secure password..."
                             required
                           />
@@ -2472,157 +2425,85 @@ export default function Home() {
 
   // --- DEFAULT VIEW: CHATROOM ---
   return (
-    <div className={`w-full h-screen max-h-screen text-slate-800 flex flex-col font-sans antialiased overflow-hidden ${
+    <div className={`w-full h-screen max-h-screen flex flex-col font-sans antialiased overflow-hidden ${
       theme === "black" 
         ? "bg-black text-slate-100 black-theme" 
-        : isDark ? "bg-slate-950 text-slate-100" 
-          : "bg-white text-slate-800"
+        : isDark ? "bg-[#1A1A2E] text-[#E8E8F0]" 
+          : "bg-[#F5F5FA] text-[#1A1A2E]"
     }`}>
       
-      {/* 1. TOP CHATGROUP NAVBAR */}
-      <header className={`h-[60px] border-b px-6 flex items-center justify-between z-50 flex-shrink-0 backdrop-blur-md ${
+      {/* 1. TOP NAVBAR - Chatme Style */}
+      <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
         theme === "black"
           ? "bg-black border-neutral-900"
-          : isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
+          : isDark ? "bg-[#16162A] border-[#333355]" : "bg-white border-[#E0E0EA]"
       }`}>
         
-        {/* Left Branding */}
+        {/* Left: Logo */}
         <div className="flex items-center gap-2.5 select-none">
-          <svg className="w-6.5 h-6.5 text-sky-500 fill-current" viewBox="0 0 24 24">
-            <path d="M12 2C6.477 2 2 6.119 2 11.2c0 2.925 1.458 5.519 3.743 7.151l-.736 2.946a.75.75 0 001.087.828l3.414-1.707c.803.18 1.637.282 2.492.282 5.523 0 10-4.119 10-9.2C22 6.119 17.523 2 12 2zm1 13h-2v-2h2v2zm0-4h-2V7h2v4z" />
-          </svg>
-          <span className="text-[19px] font-extrabold tracking-tight bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8D44D]" : "text-[#1A1A2E]"}`}>
             ChatGroup
           </span>
         </div>
 
-        {/* Center Search bar */}
-        {currentUser && (
-          <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-            theme === "black"
-              ? "bg-[#0a0a0a] border-neutral-900"
-              : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
-          }`}>
-            <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
-            />
-          </div>
-        )}
-
-        {/* Right Nav Icons */}
-        <div className="flex items-center gap-5">
-          {currentUser && (
-            <>
-              {/* Search Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-                </svg>
-              </button>
-              
-              {/* Direct Messages Icon */}
-              <button 
-                onClick={() => setCurrentView("chat")}
-                className="text-slate-500 hover:text-slate-800 transition-colors relative"
-              >
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white animate-pulse">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-            </>
-          )}
-
-          {/* Theme Toggle Button */}
+        {/* Right: Theme toggle + Call + Bell + Avatar */}
+        <div className="flex items-center gap-4">
+          {/* Theme Toggle Switch */}
           <button
             onClick={() => {
               setTheme(prev => {
                 const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
-                setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
+                setToast(next === "light" ? "Light Theme ☀️" : next === "dark" ? "Dark Theme 🌙" : "OLED Black 🌑");
                 setTimeout(() => setToast(null), 2500);
                 return next;
               });
             }}
-            className={`p-2.5 rounded-xl border transition-all cursor-pointer active:scale-95 flex items-center justify-center ${
-              theme === "black"
-                ? "bg-[#121212] border-neutral-900 text-yellow-400 hover:bg-neutral-900 shadow-md"
-                : isDark ? "bg-slate-900 border-slate-800 text-yellow-400 hover:bg-slate-850 hover:text-yellow-300 shadow-md shadow-yellow-500/5" 
-                  : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 shadow-sm"
+            className={`w-[44px] h-[24px] rounded-full relative cursor-pointer transition-all duration-300 ${
+              isDark ? "bg-[#E8D44D]" : "bg-[#D0D0DA]"
             }`}
-            title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
+            title={`Toggle Theme`}
           >
-            {theme === "black" ? (
-              <Sun className="w-4 h-4 text-yellow-400" />
-            ) : isDark ? (
-              <Sparkles className="w-4.5 h-4.5" />
-            ) : (
-              <Moon className="w-4 h-4 text-slate-650" />
-            )}
+            <div className={`absolute top-[2px] w-[20px] h-[20px] rounded-full bg-white shadow-md transition-all duration-300 ${
+              isDark ? "left-[22px]" : "left-[2px]"
+            }`} />
           </button>
 
           {currentUser && (
             <>
-              {/* Settings gear icon */}
-              <button 
-                onClick={() => {
-                  if (currentUser) {
-                    setName(currentUser.username);
-                    setUsername(currentUser.username);
-                    setBio(currentUser.bio || "");
-                    setAvatar(currentUser.avatarUrl);
-                  }
-                  setCurrentView("settings");
-                }}
-                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400 hover:scale-105 transition-all shadow-md shadow-cyan-500/5 active:scale-95 flex items-center gap-1.5 font-extrabold text-xs cursor-pointer"
-                title="Settings Dashboard"
-              >
-                <svg className="w-4.5 h-4.5 stroke-[2.2] animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="hidden sm:inline">Profile Settings</span>
-              </button>
-
-              {/* Home Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+              {/* Phone Call Icon */}
+              <button className={`p-2 rounded-lg transition-colors ${isDark ? "text-[#9090B0] hover:text-[#E8D44D]" : "text-[#6B6B8A] hover:text-[#1A1A2E]"}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
                 </svg>
               </button>
 
-              {/* Notifications Heart */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              {/* Notification Bell */}
+              <button className={`p-2 rounded-lg transition-colors relative ${isDark ? "text-[#9090B0] hover:text-[#E8D44D]" : "text-[#6B6B8A] hover:text-[#1A1A2E]"}`}>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                 </svg>
+                {totalUnreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#E8D44D] text-[#1A1A2E] text-[9px] font-black flex items-center justify-center">
+                    {totalUnreadCount}
+                  </span>
+                )}
               </button>
 
-              {/* Logged in user avatar */}
-              <div className="relative group cursor-pointer" onClick={() => {
+              {/* User Avatar */}
+              <div className="cursor-pointer" onClick={() => {
                 if (currentUser) {
                   setName(currentUser.username);
                   setUsername(currentUser.username);
                   setBio(currentUser.bio || "");
                   setAvatar(currentUser.avatarUrl);
                 }
+                setNavView("settings");
                 setCurrentView("settings");
               }}>
-                <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
                 <img
                   src={currentUser.avatarUrl}
                   alt={currentUser.username}
-                  className="relative w-8 h-8 rounded-full object-cover border border-black active:scale-95 transition-transform"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-[#E8D44D]/30 hover:border-[#E8D44D] transition-all"
                 />
               </div>
             </>
@@ -2830,52 +2711,139 @@ export default function Home() {
           </div>
         </div>
       ) : (
-        /* MAIN 3-COLUMN FLEXBOARD VIEWPORT */
+        /* MAIN LAYOUT: NAV SIDEBAR + CONTENT */
         <div className="flex-1 flex overflow-hidden w-full relative">
           
-          {/* COLUMN 1: LEFT SIDEBAR MESSAGES LIST (350px) */}
+          {/* LEFT NAVIGATION SIDEBAR */}
+          <nav className={`hidden md:flex w-[200px] flex-shrink-0 flex-col border-r transition-all duration-300 ${
+            theme === "black"
+              ? "bg-black border-neutral-900"
+              : isDark ? "bg-[#16162A] border-[#333355]" : "bg-[#EEEEF5] border-[#E0E0EA]"
+          }`}>
+            {/* User Profile Section */}
+            <div className={`p-5 border-b ${isDark ? "border-[#333355]" : "border-[#E0E0EA]"}`}>
+              <div className="flex items-center gap-3">
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.username}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-[#E8D44D]/30"
+                />
+                <div className="min-w-0">
+                  <h3 className={`text-sm font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"}`}>
+                    {currentUser.username}
+                  </h3>
+                  <p className="text-[10px] text-emerald-400 font-semibold">Available</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Nav Items */}
+            <div className="flex-1 py-4 px-3 space-y-1">
+              <button
+                onClick={() => { setNavView("chat"); setCurrentView("chat"); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  navView === "chat"
+                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                }`}
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                </svg>
+                Chat
+              </button>
+
+              <button
+                onClick={() => { setNavView("group"); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  navView === "group"
+                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                }`}
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                </svg>
+                Group
+              </button>
+
+              <button
+                onClick={() => {
+                  setNavView("settings");
+                  if (currentUser) {
+                    setName(currentUser.username);
+                    setUsername(currentUser.username);
+                    setBio(currentUser.bio || "");
+                    setAvatar(currentUser.avatarUrl);
+                  }
+                  setCurrentView("settings");
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  navView === "settings"
+                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                }`}
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Setting
+              </button>
+            </div>
+
+            {/* Logout at bottom */}
+            <div className={`p-3 border-t ${isDark ? "border-[#333355]" : "border-[#E0E0EA]"}`}>
+              <button
+                onClick={handleLogout}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  isDark ? "text-rose-400 hover:bg-rose-500/10" : "text-rose-500 hover:bg-rose-50"
+                }`}
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                </svg>
+                Logout
+              </button>
+            </div>
+          </nav>
+
+          {/* COLUMN 1: CHAT LIST (320px) */}
           <section 
-            className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 ${
-              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
+            className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 relative ${
+              theme === "black"
+                ? "bg-black border-neutral-900"
+                : isDark ? "bg-[#1E1E35] border-[#333355]" : "bg-white border-[#E0E0EA]"
             } ${
               activeContact 
-                ? "hidden md:flex w-[350px] h-full" 
-                : "w-full md:w-[350px] h-full"
+                ? "hidden md:flex w-[320px] h-full" 
+                : "w-full md:w-[320px] h-full"
             }`}
           >
-            <div className="p-4 flex flex-col gap-3 border-b border-slate-100/10">
-              <div className={`w-full h-[36px] border rounded-lg flex items-center px-3 gap-2 ${
-                isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-200"
+            <div className="p-4 flex flex-col gap-3">
+              {/* Search Bar */}
+              <div className={`w-full h-[38px] border rounded-xl flex items-center px-3 gap-2 ${
+                theme === "black"
+                  ? "bg-[#0a0a0a] border-neutral-900"
+                  : isDark ? "bg-[#252540] border-[#333355]" : "bg-[#F0F0F8] border-[#E0E0EA]"
               }`}>
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-[#6B6B8A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
                 </svg>
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-500 font-normal"
+                  className={`bg-transparent text-sm w-full outline-none font-normal ${isDark ? "text-[#E8E8F0] placeholder-[#6B6B8A]" : "text-[#1A1A2E] placeholder-[#9090B0]"}`}
                 />
               </div>
               
-              <div className="flex justify-between items-center text-xs text-slate-450 font-bold tracking-wide">
-                <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-650">
-                  <span>Latest First</span>
-                  <svg className="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </div>
-                
-                <button 
-                  onClick={handleLogout}
-                  className="w-6 h-6 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center active:scale-90 transition-transform shadow-md"
-                  title="Logout / Exit Session"
-                >
-                  <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
+              {/* All Chat Label */}
+              <div className="flex justify-between items-center">
+                <span className={`text-xs font-bold tracking-wide ${isDark ? "text-[#9090B0]" : "text-[#6B6B8A]"}`}>
+                  All Chat
+                </span>
               </div>
             </div>
 
@@ -2902,28 +2870,24 @@ export default function Home() {
                           setIsDetailPaneOpen(false);
                         }
                       }}
-                      className={`w-full p-3 flex items-center gap-3.5 rounded-2xl relative transition-all duration-300 hover:translate-x-1 ${
+                      className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 ${
                         isActive
-                          ? isDark ? "bg-slate-800/80 border border-slate-700/50 shadow-md shadow-black/10" 
-                            : "bg-slate-100 border border-slate-200/80 shadow-sm"
-                          : isDark ? "border border-transparent hover:bg-slate-900/40 hover:border-slate-850/50" 
-                            : "border border-transparent hover:bg-slate-50/80 hover:border-slate-100"
+                          ? isDark ? "bg-[#252540] border border-[#333355]" 
+                            : "bg-[#E8E8F0] border border-[#D0D0DA]"
+                          : isDark ? "border border-transparent hover:bg-[#252540]/60" 
+                            : "border border-transparent hover:bg-[#F0F0F8]"
                       }`}
                     >
                       <div className="relative flex-shrink-0">
-                        <div className={`w-[52px] h-[52px] rounded-full overflow-hidden p-[2.5px] ${
-                          isActive ? "insta-gradient-border" : isDark ? "border border-slate-800" : "border border-slate-200"
-                        }`}>
+                        <div className="w-[46px] h-[46px] rounded-full overflow-hidden">
                           <img 
                             src={user.avatarUrl} 
-                            className={`w-full h-full rounded-full object-cover border ${
-                              isDark ? "border-slate-900" : "border-white"
-                            }`} 
+                            className="w-full h-full rounded-full object-cover" 
                           />
                         </div>
                         
-                        <span className={`absolute top-0.5 right-0.5 w-3 h-3 rounded-full border-2 ${
-                          isDark ? "border-slate-900" : "border-white"
+                        <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
+                          isDark ? "border-[#1E1E35]" : "border-white"
                         } ${
                           isTyping ? "bg-amber-400 animate-pulse" :
                           isOnline ? "bg-emerald-500 pulse-online" :
@@ -2933,19 +2897,19 @@ export default function Home() {
                       
                       <div className="flex-1 text-left min-w-0">
                         <div className="flex justify-between items-center mb-0.5">
-                          <span className={`text-[13.5px] font-bold tracking-wide truncate ${
-                            isDark ? "text-slate-200" : "text-slate-700"
+                          <span className={`text-[13px] font-bold truncate ${
+                            isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"
                           }`}>
-                            {user.username.toUpperCase()}
+                            {user.username}
                           </span>
                           {lastMsg ? (
-                            <span className="text-[10px] text-slate-450 font-semibold">{lastMsg.time}</span>
+                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>{lastMsg.time}</span>
                           ) : (
-                            <span className="text-[10px] text-slate-450 font-medium">08:04 AM</span>
+                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>08:04 AM</span>
                           )}
                         </div>
                         
-                        <div className="text-[11.5px] text-slate-500 truncate leading-snug">
+                        <div className={`text-[11.5px] truncate leading-snug ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
                           {isTyping ? (
                             <span className="text-purple-500 font-bold animate-pulse">typing...</span>
                           ) : rel && rel.status === 'pending' ? (
@@ -2963,11 +2927,11 @@ export default function Home() {
                       </div>
 
                       {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
-                        <span className="absolute right-4 w-7 h-4.5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500 text-[9px] font-black text-white flex items-center justify-center select-none shadow animate-pulse">
+                        <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8D44D] text-[9px] font-black text-[#1A1A2E] flex items-center justify-center select-none shadow animate-pulse">
                           REQ
                         </span>
                       ) : hasMockBadge ? (
-                        <span className="absolute right-4 w-4.5 h-4.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-[10px] font-black text-white flex items-center justify-center select-none shadow">
+                        <span className="absolute right-3 w-5 h-5 rounded-full bg-[#E8D44D] text-[10px] font-black text-[#1A1A2E] flex items-center justify-center select-none">
                           1
                         </span>
                       ) : null}
@@ -2976,12 +2940,24 @@ export default function Home() {
                 })
               )}
             </div>
+
+            {/* Golden + FAB for new chat */}
+            <button
+              className="fab-new-chat"
+              title="New Chat"
+            >
+              <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </button>
           </section>
 
           {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM */}
           <main 
             className={`flex-1 flex flex-col border-r transition-all duration-300 ${
-              isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
+              theme === "black"
+                ? "bg-black border-neutral-900"
+                : isDark ? "bg-[#1A1A2E] border-[#333355]" : "bg-white border-[#E0E0EA]"
             } ${
               !activeContact 
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
@@ -2991,8 +2967,10 @@ export default function Home() {
             {activeContact ? (
               <>
                 {/* Active Chat Header */}
-                <header className={`h-[60px] px-6 border-b flex items-center justify-between flex-shrink-0 z-40 select-none backdrop-blur-md ${
-                  isDark ? "bg-[#000000]/95 border-slate-900" : "bg-white/95 border-slate-200"
+                <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
+                  theme === "black"
+                    ? "bg-black border-neutral-900"
+                    : isDark ? "bg-[#16162A] border-[#333355]" : "bg-white border-[#E0E0EA]"
                 }`}>
                   <div className="flex items-center gap-3">
                     <button 
@@ -3017,9 +2995,9 @@ export default function Home() {
                       }`} />
                     </div>
                     <div>
-                      <h3 className={`text-sm font-bold tracking-wide ${isDark ? "text-slate-100" : "text-slate-800"}`}>{activeContact.username}</h3>
-                      <p className="text-[10px] text-slate-400 font-semibold tracking-wide">
-                        {typingUsers[activeContact.username] ? "typing..." : "Active now"}
+                      <h3 className={`text-sm font-bold ${isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"}`}>{activeContact.username}</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
+                        {typingUsers[activeContact.username] ? "typing..." : "Last seen 04.10 pm"}
                       </p>
                     </div>
                   </div>
@@ -3050,36 +3028,12 @@ export default function Home() {
                         </svg>
                       </button>
                     )}
-
-                    <button 
-                      onClick={() => setIsDetailPaneOpen((prev) => !prev)}
-                      className={`w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer ${
-                        isDetailPaneOpen ? "bg-slate-100/10 text-slate-300" : ""
-                      }`}
-                    >
-                      <svg className="w-5.5 h-5.5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 111.063.852l-.708 2.836a.75.75 0 001.063.852l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                      </svg>
-                    </button>
                   </div>
                 </header>
 
-                {/* Message feeds stream */}
-                <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-5 custom-scrollbar flex flex-col ${
-                  isDark ? "bg-black" : "bg-white"
+                <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar flex flex-col ${
+                  theme === "black" ? "bg-black" : isDark ? "bg-[#1A1A2E]" : "bg-[#F5F5FA]"
                 }`}>
-                  
-                  {/* Sync info banner */}
-                  <div className="w-full bg-indigo-50/5 border border-indigo-500/10 rounded-xl p-3 flex items-center justify-between text-xs text-indigo-400 gap-3 shadow-sm select-none animate-chat-bubble flex-shrink-0">
-                    <div className="flex items-center gap-2.5">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-                      </span>
-                      <span><b>Real-time Sync Active</b>: Open this site in another tab to chat live.</span>
-                    </div>
-                    <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider bg-indigo-500/10 px-2 py-0.5 rounded">Tab Sync</span>
-                  </div>
 
                   {conversationMessages.map((msg) => {
                     const isMe = msg.sender === currentUser.username;
@@ -3101,11 +3055,11 @@ export default function Home() {
 
                         <div className="flex flex-col max-w-[70%]">
                           <div
-                            className={`px-4 py-2.5 rounded-[20px] text-[14px] leading-relaxed shadow-md break-words relative transition-all ${
+                            className={`px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words relative ${
                               isMe
-                                ? "bg-gradient-to-tr from-sky-500 via-blue-600 to-indigo-600 text-white rounded-br-xs shadow-blue-500/10 border border-blue-500/20"
-                                : isDark ? "bg-slate-900/90 text-slate-100 rounded-bl-xs border border-slate-800/80 shadow-black/10"
-                                  : "bg-slate-100/90 text-slate-800 rounded-bl-xs border border-slate-200/50 shadow-slate-100/50"
+                                ? "bg-[#E8D44D] text-[#1A1A2E] rounded-br-sm"
+                                : isDark ? "bg-[#2D2D4A] text-[#E8E8F0] rounded-bl-sm border border-[#333355]"
+                                  : "bg-[#F0F0F8] text-[#1A1A2E] rounded-bl-sm border border-[#E0E0EA]"
                             }`}
                           >
                             {msg.text && <p className="font-normal">{msg.text}</p>}
@@ -3118,8 +3072,8 @@ export default function Home() {
                               />
                             )}
 
-                            <div className="flex items-center justify-end mt-1 text-[9px] font-semibold select-none">
-                              <span className={isMe ? "text-white/80" : "text-slate-400"}>{msg.time}</span>
+                            <div className="flex items-center justify-end mt-1 text-[9px] font-medium select-none">
+                              <span className={isMe ? "text-[#1A1A2E]/70" : isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}>{msg.time}</span>
                               {isMe && msg.status && renderCheckmarks(msg.status)}
                             </div>
                           </div>

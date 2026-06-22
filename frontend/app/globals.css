@@ -1,129 +1,108 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  --background: #000000;
-  --foreground: #f8fafc;
+  --background: #1A1A2E;
+  --foreground: #E8E8F0;
+  --accent: #E8D44D;
+  --accent-hover: #F0E050;
+  --surface: #252540;
+  --surface-light: #2D2D4A;
+  --surface-dark: #16162A;
+  --border: #333355;
+  --border-light: #3D3D60;
+  --text-primary: #E8E8F0;
+  --text-secondary: #9090B0;
+  --text-muted: #6B6B8A;
+  --sent-bubble: #E8D44D;
+  --sent-text: #1A1A2E;
+  --received-bubble: #2D2D4A;
+  --received-text: #E8E8F0;
+  --nav-active: rgba(232, 212, 77, 0.12);
+  --nav-active-border: #E8D44D;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: 'Inter', var(--font-geist-sans), sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
+  font-family: 'Inter', var(--font-sans), sans-serif;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
 }
 
-/* Floating Ambient Orbs Keyframe Animations */
+/* ===== CHATME DARK THEME ===== */
+
+/* Glass card for auth */
+.glass-card-dark {
+  background: rgba(37, 37, 64, 0.75);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Floating Ambient Orbs */
 @keyframes float-slow {
-
-  0%,
-  100% {
-    transform: translateY(0px) scale(1);
-  }
-
-  50% {
-    transform: translateY(-25px) scale(1.05);
-  }
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-25px) scale(1.05); }
 }
 
 @keyframes float-medium {
-
-  0%,
-  100% {
-    transform: translateY(0px) scale(1) rotate(0deg);
-  }
-
-  50% {
-    transform: translateY(20px) scale(0.95) rotate(180deg);
-  }
+  0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); }
+  50% { transform: translateY(20px) scale(0.95) rotate(180deg); }
 }
 
-.animate-float-slow {
-  animation: float-slow 15s ease-in-out infinite;
-}
+.animate-float-slow { animation: float-slow 15s ease-in-out infinite; }
+.animate-float-medium { animation: float-medium 20s ease-in-out infinite; }
 
-.animate-float-medium {
-  animation: float-medium 20s ease-in-out infinite;
-}
-
-/* Custom Keyframe Animations for iOS Feel */
+/* Slide & Fade Animations */
 @keyframes slideUp {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: translateY(0);
-  }
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
 @keyframes slideDown {
-  from {
-    transform: translateY(-50px);
-    opacity: 0;
-  }
-
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
+  from { transform: translateY(-50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.animate-slide-up {
-  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+@keyframes chatBubbleIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.animate-slide-down {
-  animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
+.animate-slide-up { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+.animate-chat-bubble { animation: chatBubbleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
-.animate-fade-in {
-  animation: fadeIn 0.25s ease-out forwards;
-}
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
 
-/* Frosted Glassmorphism Styles (True Black AMOLED Optimization) */
-.glass-card-dark {
-  background: rgba(10, 10, 12, 0.65);
-  backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-/* Custom scrollbar utility */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
+.scrollbar-thin::-webkit-scrollbar { width: 4px; height: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
 
 /* Online Status Pulse */
 .pulse-online {
@@ -132,111 +111,130 @@ body {
 }
 
 @keyframes pulse-green {
-  0% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-  }
-
-  70% {
-    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
-  }
-
-  100% {
-    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 
-/* Ensure active/accent state colors are preserved by overriding general color rules */
-.light-theme .text-cyan-400 {
-  color: #22d3ee !important;
+/* Instagram-style gradient ring for active contact */
+.insta-gradient-border {
+  background: linear-gradient(135deg, #E8D44D, #F0A030, #E8D44D) padding-box,
+              linear-gradient(135deg, #E8D44D, #F0A030, #E8D44D) border-box;
 }
 
-.light-theme .text-cyan-500 {
-  color: #06b6d4 !important;
+/* ===== LEFT NAV SIDEBAR ===== */
+.nav-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--surface-dark);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
 }
 
-.light-theme .text-emerald-400 {
-  color: #34d399 !important;
+.nav-sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 12px;
+  margin: 2px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
-.light-theme .text-emerald-500 {
-  color: #10b981 !important;
+.nav-sidebar .nav-item:hover {
+  background: rgba(232, 212, 77, 0.06);
+  color: var(--text-primary);
 }
 
-.light-theme .text-rose-400 {
-  color: #fb7185 !important;
+.nav-sidebar .nav-item.active {
+  background: var(--nav-active);
+  color: var(--accent);
+  border-color: rgba(232, 212, 77, 0.15);
 }
 
-.light-theme .text-rose-500 {
-  color: #f43f5e !important;
+/* ===== GOLDEN ACCENT BUTTONS ===== */
+.btn-accent {
+  background: var(--accent);
+  color: var(--sent-text);
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.light-theme .text-amber-400 {
-  color: #fbbf24 !important;
+.btn-accent:hover {
+  background: var(--accent-hover);
+  transform: scale(1.02);
 }
 
-.light-theme .text-amber-500 {
-  color: #f59e0b !important;
+.btn-accent:active {
+  transform: scale(0.96);
 }
 
-.light-theme .text-indigo-400 {
-  color: #818cf8 !important;
+/* ===== FAB (Floating Action Button) ===== */
+.fab-new-chat {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--sent-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(232, 212, 77, 0.25);
+  transition: all 0.2s ease;
+  z-index: 20;
+  border: none;
 }
 
-.light-theme .text-indigo-500 {
-  color: #6366f1 !important;
+.fab-new-chat:hover {
+  background: var(--accent-hover);
+  transform: scale(1.1);
+  box-shadow: 0 10px 30px rgba(232, 212, 77, 0.35);
 }
 
-.light-theme .text-indigo-600 {
-  color: #4f46e5 !important;
+.fab-new-chat:active {
+  transform: scale(0.95);
 }
 
-.light-theme .text-indigo-400 * {
-  color: #818cf8 !important;
-}
-
-.light-theme .text-cyan-400 * {
-  color: #22d3ee !important;
-}
-
-.light-theme .text-emerald-400 * {
-  color: #34d399 !important;
+/* ===== LIGHT THEME OVERRIDES ===== */
+.light-theme {
+  --background: #F5F5FA;
+  --surface: #FFFFFF;
+  --surface-light: #F0F0F8;
+  --surface-dark: #EEEEF5;
+  --border: #E0E0EA;
+  --border-light: #D5D5E0;
+  --text-primary: #1A1A2E;
+  --text-secondary: #6B6B8A;
+  --text-muted: #9090B0;
+  --received-bubble: #F0F0F8;
+  --received-text: #1A1A2E;
 }
 
 /* OLED Black Theme Overrides */
 .black-theme {
+  --background: #000000;
+  --surface: #0A0A0A;
+  --surface-light: #141414;
+  --surface-dark: #000000;
+  --border: #1A1A1A;
+  --border-light: #222222;
   background-color: #000000 !important;
   color: #f3f4f6 !important;
-
-  /* Override Tailwind CSS variables for pure OLED black look */
-  --color-slate-950: #000000 !important;
-  --color-slate-900: #050505 !important;
-  --color-slate-850: #0a0a0a !important;
-  --color-slate-800: #121212 !important;
-  --color-slate-700: #1a1a1a !important;
-  --color-slate-650: #222222 !important;
-  --color-slate-600: #262626 !important;
-  --color-slate-500: #525252 !important;
-  --color-slate-400: #a3a3a3 !important;
-
-  background-image: none !important;
 }
 
-/* Force custom bracket background class overrides */
-.black-theme .bg-\[\#04060A\],
-.black-theme .bg-\[\#080B12\]\/80,
-.black-theme .bg-\[\#080B12\] {
-  background-color: #000000 !important;
-}
-
-/* Force border styling updates */
-.black-theme .border-slate-800\/80,
-.black-theme .border-slate-800,
-.black-theme .border-slate-900\/60,
-.black-theme .border-slate-200 {
-  border-color: #121212 !important;
-}
-
-/* OLED form overrides */
 .black-theme input,
 .black-theme textarea,
 .black-theme select {
@@ -248,4 +246,53 @@ body {
 .black-theme input::placeholder,
 .black-theme textarea::placeholder {
   color: #525252 !important;
+}
+
+/* Unread badge golden */
+.unread-badge {
+  background: var(--accent);
+  color: var(--sent-text);
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+/* Toggle switch styling */
+.theme-toggle {
+  width: 48px;
+  height: 26px;
+  border-radius: 13px;
+  background: var(--surface-light);
+  border: 1px solid var(--border);
+  position: relative;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.theme-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.theme-toggle.active::after {
+  left: 24px;
 }
