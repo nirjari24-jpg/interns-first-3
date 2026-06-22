@@ -46,78 +46,6 @@ const emitToUser = (username: string, event: string, data: any) => {
   return false;
 };
 
-// Built-in mock contacts with secure credentials to seed the database if empty
-const MOCK_CONTACTS = [
-  {
-    username: "Ana Malbasa",
-    email: "ana@chatgroup.com",
-    password: bcrypt.hashSync("password123", 10),
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
-    category: "PERSONAL BLOG",
-    bio: "Lorem Ipsum Dolor Sit Amet, Consectetur Adipiscing Elit. Donec Sit Amet Nunc Augue. Pellentesque Vel Pellentesque Tellus. Nam Lacinia Leo Sed Eleifend Dignissim.",
-    statusText: "Active 5m ago"
-  },
-  {
-    username: "Paul Osmand",
-    email: "paul@chatgroup.com",
-    password: bcrypt.hashSync("password123", 10),
-    avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80",
-    category: "CREATIVE DESIGNER",
-    bio: "Passionate about layouts, dark themes, and rich aesthetics. UI developer & animator based in London.",
-    statusText: "hahah, nice!"
-  },
-  {
-    username: "Edward Davis",
-    email: "edward@chatgroup.com",
-    password: bcrypt.hashSync("password123", 10),
-    avatarUrl: "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=150&h=150&q=80",
-    category: "PHOTOGRAPHER",
-    bio: "Capturing moments and cityscapes. Let's grab coffee and share our logs.",
-    statusText: "Are we still going for a coffee?"
-  },
-  {
-    username: "Naomi Riste",
-    email: "naomi@chatgroup.com",
-    password: bcrypt.hashSync("password123", 10),
-    avatarUrl: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&h=150&q=80",
-    category: "WRITER",
-    bio: "Words shape worlds. Blogging, script-writing, and coffee lover.",
-    statusText: "What did your boss say?"
-  },
-  {
-    username: "Jonathan Blake",
-    email: "jonathan@chatgroup.com",
-    password: bcrypt.hashSync("password123", 10),
-    avatarUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80",
-    category: "ARTIST",
-    bio: "Abstract lines, digital oil paint, and visual animations.",
-    statusText: "Sent you some media"
-  }
-];
-
-// Clean up default users and non-gmail users from database to show only registered users
-const seedDatabase = async () => {
-  try {
-    console.log('Cleaning up mock contacts and non-gmail users from MongoDB to show only registered users...');
-    const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
-    await User.deleteMany({ email: { $in: mockEmails } });
-    await User.deleteMany({ email: { $not: /@gmail\.com$/i } });
-    console.log('Mock contacts and non-gmail users successfully removed!');
-
-    // Clean up mock relationships
-    const mockUsernames = MOCK_CONTACTS.map(c => c.username);
-    await MessageRequest.deleteMany({
-      $or: [
-        { sender: { $in: mockUsernames } },
-        { recipient: { $in: mockUsernames } }
-      ]
-    });
-    console.log('Mock relationships successfully cleaned!');
-  } catch (err) {
-    console.error('Error cleaning up mock contacts:', err);
-  }
-};
-
 let mongoMemoryInstance: MongoMemoryServer | null = null;
 
 // Database Connection
@@ -128,7 +56,6 @@ const connectDB = async () => {
     console.log(`Connecting to MongoDB at: ${dbUri}`);
     await mongoose.connect(dbUri, { serverSelectionTimeoutMS: 2000 });
     console.log('Connected to MongoDB Atlas / Database');
-    await seedDatabase();
   } catch (err: any) {
     console.warn('MongoDB connection error:', err.message);
     console.log('Attempting to start a persistent in-memory MongoDB server as fallback...');
@@ -149,7 +76,6 @@ const connectDB = async () => {
       console.log(`Starting persistent MongoDB server at: ${inMemoryUri} with dbPath: ${dbPersistPath}`);
       await mongoose.connect(inMemoryUri);
       console.log('Connected to Persistent MongoMemoryServer Database!');
-      await seedDatabase();
     } catch (memErr: any) {
       console.error('Failed to start persistent MongoDB fallback server:', memErr.message);
       console.log('Falling back to volatile ephemeral MongoMemoryServer...');
@@ -158,7 +84,6 @@ const connectDB = async () => {
         const inMemoryUri = mongoMemoryInstance.getUri();
         await mongoose.connect(inMemoryUri);
         console.log('Connected to Volatile Ephemeral MongoDB Database!');
-        await seedDatabase();
       } catch (ephErr: any) {
         console.error('Critical: Failed to start any MongoDB server:', ephErr.message);
       }
@@ -331,14 +256,14 @@ app.get('/api/health', (req: Request, res: Response) => {
 // USERS REST API
 // Register a new user
 app.post('/api/users/register', async (req: Request, res: Response): Promise<any> => {
-  const { email, password, avatarUrl, category, bio } = req.body;
+  const { username: requestedUsername, email, password, avatarUrl, category, bio } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password are required' });
   }
 
-  const username = email.trim().split('@')[0];
+  const username = (requestedUsername && requestedUsername.trim()) || email.trim().split('@')[0];
   if (!username) {
-    return res.status(400).json({ error: 'Invalid email address' });
+    return res.status(400).json({ error: 'Invalid username or email address' });
   }
 
   if (!email.trim().toLowerCase().endsWith('@gmail.com')) {

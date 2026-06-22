@@ -70,43 +70,7 @@ const PRESET_AVATARS = [
 ];
 
 // Default built-in mock contacts based on the user's screenshot
-const MOCK_CONTACTS: User[] = [
-  {
-    username: "Ana Malbasa",
-    avatarUrl: PRESET_AVATARS[0],
-    category: "PERSONAL BLOG",
-    bio: "Lorem Ipsum Dolor Sit Amet, Consectetur Adipiscing Elit. Donec Sit Amet Nunc Augue. Pellentesque Vel Pellentesque Tellus. Nam Lacinia Leo Sed Eleifend Dignissim.",
-    statusText: "Active 5m ago"
-  },
-  {
-    username: "Paul Osmand",
-    avatarUrl: PRESET_AVATARS[1],
-    category: "CREATIVE DESIGNER",
-    bio: "Passionate about layouts, dark themes, and rich aesthetics. UI developer & animator based in London.",
-    statusText: "hahah, nice!"
-  },
-  {
-    username: "Edward Davis",
-    avatarUrl: PRESET_AVATARS[4],
-    category: "PHOTOGRAPHER",
-    bio: "Capturing moments and cityscapes. Let's grab coffee and share our logs.",
-    statusText: "Are we still going for a coffee?"
-  },
-  {
-    username: "Naomi Riste",
-    avatarUrl: PRESET_AVATARS[5],
-    category: "WRITER",
-    bio: "Words shape worlds. Blogging, script-writing, and coffee lover.",
-    statusText: "What did your boss say?"
-  },
-  {
-    username: "Jonathan Blake",
-    avatarUrl: PRESET_AVATARS[3],
-    category: "ARTIST",
-    bio: "Abstract lines, digital oil paint, and visual animations.",
-    statusText: "Sent you some media"
-  }
-];
+const MOCK_CONTACTS: User[] = [];
 
 const EMOJI_CATEGORIES = [
   { name: "Smileys", icon: "😀", list: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚", "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "😎", "🤩", "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬", "🤯", "🥵", "🥶", "😱", "😰", "😥", "😓"] },
@@ -154,12 +118,13 @@ export default function Home() {
         if (users && Array.isArray(users)) {
           setRegisteredUsers(users);
           setActiveContact(prev => {
-            const otherUsers = userToExclude
-              ? users.filter(u => u && u.username && u.username.toLowerCase() !== userToExclude.username.toLowerCase())
+            // Safely filter out the current user if it exists
+            const otherUsers = userToExclude && userToExclude.username
+              ? users.filter(u => u?.username && userToExclude?.username && u.username.toLowerCase() !== userToExclude.username.toLowerCase())
               : users;
             
             if (prev) {
-              const exists = otherUsers.find(u => u.username.toLowerCase() === prev.username.toLowerCase());
+              const exists = otherUsers.find(u => u && u.username && u.username.toLowerCase() === prev.username.toLowerCase());
               return exists || null;
             }
             
@@ -183,12 +148,12 @@ export default function Home() {
   const isDark = theme === "dark" || theme === "black";
 
   // Account Detail States
-  const [name, setName] = useState("Om Gadhiya");
-  const [username, setUsername] = useState("om_gadhiya_001");
-  const [email, setEmail] = useState("omgadhiya97@gmail.com");
-  const [phone, setPhone] = useState("+91 97245 67890");
-  const [bio, setBio] = useState("Education | Learning and Building Premium Web Apps 🚀");
-  const [avatar, setAvatar] = useState("/om_gadhiya.png");
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatar, setAvatar] = useState("");
 
   // Password Change States
   const [currentPassword, setCurrentPassword] = useState("omgadhiya97@123");
@@ -218,6 +183,7 @@ export default function Home() {
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState<boolean>(false);
   const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(PRESET_AVATARS[0]);
@@ -751,8 +717,8 @@ export default function Home() {
     // Mock contacts are disabled
 
     const match = messageRequests.find(r => 
-      (r.sender.toLowerCase() === currentUser.username.toLowerCase() && r.recipient.toLowerCase() === contactUsername.toLowerCase()) ||
-      (r.sender.toLowerCase() === contactUsername.toLowerCase() && r.recipient.toLowerCase() === currentUser.username.toLowerCase())
+      (currentUser?.username && r.sender.toLowerCase() === currentUser.username.toLowerCase() && r.recipient.toLowerCase() === contactUsername.toLowerCase()) ||
+      (contactUsername && r.sender.toLowerCase() === contactUsername.toLowerCase() && currentUser?.username && r.recipient.toLowerCase() === currentUser.username.toLowerCase())
     );
     return match || null;
   };
@@ -1365,13 +1331,7 @@ export default function Home() {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    if (!regEmail.trim() || !regPassword) return;
-
-    const generatedUsername = regEmail.trim().split('@')[0];
-    if (!generatedUsername) {
-      setAuthError("Invalid email address.");
-      return;
-    }
+    if (!regUsername.trim() || !regEmail.trim() || !regPassword) return;
 
     if (isAuthLoading) return;
 
@@ -1387,7 +1347,7 @@ export default function Home() {
     }
 
     const reqBody = {
-      username: generatedUsername,
+      username: regUsername.trim(),
       email: regEmail.trim().toLowerCase(),
       password: regPassword.trim(),  // trim to avoid accidental spaces
       avatarUrl: selectedAvatarUrl,
@@ -1511,62 +1471,6 @@ export default function Home() {
     // Mock auto-reply triggered by MOCK_CONTACTS is disabled
   };
 
-  // Simulated responses for offline directory contacts
-  const triggerMockResponse = (contactName: string) => {
-    setTimeout(() => {
-      setTypingUsers((prev) => ({ ...prev, [contactName]: true }));
-      setTimeout(() => scrollToBottom("smooth"), 50);
-
-      setTimeout(() => {
-        const replies = [
-          "Cool! I'll double check my schedules.",
-          "Awesome. Send me the media logs when you've got them.",
-          "It's a gorgeous photo, where was it taken?",
-          "Sure thing, talk to you later tonight!",
-          "Yes! Let's get together soon."
-        ];
-        const text = replies[Math.floor(Math.random() * replies.length)];
-        const timeStringVal = new Date().toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit"
-        });
-
-        if (!currentUser) return;
-
-        fetch(`${API_BASE}/api/messages`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sender: contactName,
-            recipient: currentUser.username,
-            text,
-            time: timeStringVal,
-            status: "sent"
-          })
-        })
-        .then(res => res.json())
-        .then(savedMsg => {
-          setMessages(prev => [...prev, savedMsg]);
-          setTypingUsers((prev) => ({ ...prev, [contactName]: false }));
-          playSound("receive");
-          setTimeout(() => scrollToBottom("smooth"), 50);
-        })
-        .catch(err => console.error("Error saving mock reply:", err));
-      }, 2000);
-    }, 1500);
-  };
-
-  // Mock attachment click: triggers a gorgeous nature photography message send
-  const handleSendMockImage = () => {
-    if (!currentUser || !activeContact) return;
-    const mockImageUrls = [
-      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=400&q=80",
-      "https://images.unsplash.com/photo-1472214222555-d404758b1c42?auto=format&fit=crop&w=400&q=80"
-    ];
-    const chosenImage = mockImageUrls[Math.floor(Math.random() * mockImageUrls.length)];
-    handleSendMessage("", chosenImage);
-  };
 
   const handleChatImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1686,6 +1590,7 @@ export default function Home() {
   function handleLogout() {
     setCurrentUser(null);
     setActiveContact(null);
+    setCurrentView("chat");
     localStorage.removeItem("chatgroup_current_user");
     localStorage.removeItem("chatgroup_session_token");
   }
@@ -1969,6 +1874,24 @@ export default function Home() {
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="hidden lg:block lg:col-span-4 space-y-6">
+              {/* User Profile Card */}
+              <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 flex flex-col items-center text-center ${
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+              }`}>
+                <div className="relative group mb-3">
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-60 blur-xs" />
+                  <div className="relative w-16 h-16 rounded-full overflow-hidden border-[2.5px] border-slate-950 bg-slate-900">
+                    <img
+                      src={currentUser?.avatarUrl || avatar}
+                      alt={currentUser?.username || name}
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                </div>
+                <h3 className="text-sm font-extrabold tracking-tight">{currentUser?.username || name}</h3>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate w-full mt-0.5">{currentUser?.email || email}</p>
+              </div>
+
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 ${
                 isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
               }`}>
@@ -1997,6 +1920,16 @@ export default function Home() {
                   >
                     <Lock className="w-4.5 h-4.5" />
                     <span>Password & Security</span>
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
+                  >
+                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
+                    <span>Log Out</span>
                   </button>
                 </div>
               </div>
@@ -2083,6 +2016,38 @@ export default function Home() {
                 >
                   <Lock className="w-4 h-4" />
                   <span>Security</span>
+                </button>
+              </div>
+
+              {/* Mobile User Profile Card & Log Out */}
+              <div className={`flex lg:hidden flex-col sm:flex-row items-center justify-between gap-4 p-4 border rounded-[24px] transition-all duration-500 ${
+                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-sm"
+              }`}>
+                <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
+                  <div className="relative group flex-shrink-0">
+                    <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-60 blur-xs" />
+                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-slate-950 bg-slate-900">
+                      <img
+                        src={currentUser?.avatarUrl || avatar}
+                        alt={currentUser?.username || name}
+                        className="object-cover w-full h-full"
+                      />
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-extrabold truncate">{currentUser?.username || name}</h3>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{currentUser?.email || email}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleLogout}
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-xs transition-all border cursor-pointer bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                  </svg>
+                  <span>Log Out</span>
                 </button>
               </div>
               
@@ -2474,26 +2439,13 @@ export default function Home() {
             placeholder="Search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
+            className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-455 font-normal"
           />
         </div>
 
         {/* Right Nav Icons */}
         <div className="flex items-center gap-5">
-          {/* Search Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-            </svg>
-          </button>
-          
-          {/* Direct Messages Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors relative">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-            <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white">1</span>
-          </button>
+
 
           {/* Theme Toggle Button */}
           <button
@@ -2543,19 +2495,7 @@ export default function Home() {
             <span className="hidden sm:inline">Profile Settings</span>
           </button>
 
-          {/* Home Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-            </svg>
-          </button>
 
-          {/* Notifications Heart */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-          </button>
 
           {/* Logged in user avatar */}
           {currentUser ? (
@@ -2674,20 +2614,6 @@ export default function Home() {
                   {isAuthLoading ? "Signing In..." : "Sign In"}
                 </button>
 
-                {/* Demo credentials hint */}
-                <div className={`w-full mt-1 px-3 py-2.5 rounded-xl border text-[10px] leading-relaxed ${
-                  isDark
-                    ? "bg-sky-500/5 border-sky-500/15 text-slate-400"
-                    : "bg-sky-50 border-sky-100 text-slate-500"
-                }`}>
-                  <span className="font-extrabold text-sky-400 uppercase tracking-wider text-[9px]">Demo Accounts</span>
-                  <br />
-                  <span className="font-semibold">paul@chatgroup.com</span> · <span className="opacity-70">password123</span>
-                  <br />
-                  <span className="font-semibold">ana@chatgroup.com</span> · <span className="opacity-70">password123</span>
-                  <br />
-                  <span className="opacity-60 text-[9px]">Or sign up to create your own account.</span>
-                </div>
 
                 <p className="text-[11.5px] text-slate-450 text-center mt-3 font-semibold">
                   Don't have an account?{" "}
@@ -2727,6 +2653,21 @@ export default function Home() {
                 </div>
 
                 <div className="flex flex-col gap-2">
+                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Username</label>
+                  <input
+                    type="text"
+                    value={regUsername}
+                    onChange={(e) => setRegUsername(e.target.value)}
+                    placeholder="e.g. ann123"
+                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
+                    }`}
+                    required
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Email Address</label>
                   <input
                     type="email"
@@ -2741,19 +2682,28 @@ export default function Home() {
                   />
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 relative">
                   <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
-                  <input
-                    type="password"
-                    value={regPassword}
-                    onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Create a password"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type={showRegPassword ? "text" : "password"}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      placeholder="Create a password"
+                      className={`w-full pl-4 pr-11 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                        isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
+                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
+                      }`}
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 transition-colors"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
+                    </button>
+                  </div>
                 </div>
 
                 <button
@@ -2819,17 +2769,7 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                   </svg>
                 </div>
-                
-                <button 
-                  onClick={handleLogout}
-                  className="w-6 h-6 rounded-full bg-sky-500 hover:bg-sky-400 text-white flex items-center justify-center active:scale-90 transition-transform shadow-md"
-                  title="Logout / Exit Session"
-                >
-                  <svg className="w-3.5 h-3.5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                </button>
-              </div>
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
@@ -2844,7 +2784,6 @@ export default function Home() {
                   const lastMsg = getLastMessage(user.username);
                   const rel = getChatRelationship(user.username);
                   
-                  const hasMockBadge = (user.username === "Paul Osmand" || user.username === "Edward Davis") && !lastMsg;
 
                   return (
                     <button
@@ -2918,10 +2857,6 @@ export default function Home() {
                       {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
                         <span className="absolute right-4 w-7 h-4.5 rounded-full bg-gradient-to-r from-sky-400 to-indigo-500 text-[9px] font-black text-white flex items-center justify-center select-none shadow animate-pulse">
                           REQ
-                        </span>
-                      ) : hasMockBadge ? (
-                        <span className="absolute right-4 w-4.5 h-4.5 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-[10px] font-black text-white flex items-center justify-center select-none shadow">
-                          1
                         </span>
                       ) : null}
                     </button>

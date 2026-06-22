@@ -228,12 +228,32 @@ body {
   background-color: #000000 !important;
 }
 
-/* Force border styling updates */
+/* High visibility borders in dark/black themes */
+.border-slate-900,
+.border-slate-850,
+.border-slate-800,
+.border-slate-800\/80,
+.border-slate-900\/60,
+.border-neutral-900 {
+  border-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Light Theme Border Reset */
+.light-theme .border-slate-900,
+.light-theme .border-slate-850,
+.light-theme .border-slate-800,
+.light-theme .border-slate-800\/80,
+.light-theme .border-slate-900\/60,
+.light-theme .border-neutral-900 {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Force border styling updates for black-theme */
 .black-theme .border-slate-800\/80,
 .black-theme .border-slate-800,
 .black-theme .border-slate-900\/60,
 .black-theme .border-slate-200 {
-  border-color: #121212 !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
 }
 
 /* OLED form overrides */
