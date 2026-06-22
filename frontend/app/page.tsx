@@ -226,6 +226,7 @@ export default function Home() {
   // Chat window states
   const [activeContact, setActiveContact] = useState<User | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [inputText, setInputText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -744,6 +745,25 @@ export default function Home() {
       .catch(err => console.warn("Error fetching requests:", err));
   };
 
+  // Fetch unread messages count from server
+  const fetchUnreadMessagesCount = () => {
+    const userVal = localStorage.getItem("chatgroup_current_user");
+    if (!userVal) return;
+    try {
+      const parsed = JSON.parse(userVal);
+      fetch(`${API_BASE}/api/messages/unread-count?user=${parsed.username}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data && typeof data.count === 'number') {
+            setUnreadMessagesCount(data.count);
+          }
+        })
+        .catch(err => console.warn("Error fetching unread count:", err));
+    } catch (e) {
+      console.warn("Error parsing current user", e);
+    }
+  };
+
   // Helper to resolve request status between current user and a contact
   const getChatRelationship = (contactUsername: string) => {
     if (!currentUser || !currentUser.username || !contactUsername) return null;
@@ -900,6 +920,7 @@ export default function Home() {
 
     fetchUsers(initialUser, true);
     fetchRequests();
+    fetchUnreadMessagesCount();
   }, [API_BASE]);
 
   // Save theme changes to Local Cache
@@ -912,6 +933,7 @@ export default function Home() {
     const interval = setInterval(() => {
       fetchUsers(currentUser, false);
       fetchRequests();
+      fetchUnreadMessagesCount();
     }, 10000);
     return () => clearInterval(interval);
   }, [API_BASE, currentUser]);
@@ -974,6 +996,7 @@ export default function Home() {
         });
       } else {
         playSound("receive");
+        setUnreadMessagesCount((prev) => prev + 1);
       }
       setTimeout(() => scrollToBottom("smooth"), 50);
     });
@@ -993,11 +1016,11 @@ export default function Home() {
     });
 
     // Listen for read receipts from other users
-    socket.on("messagesRead", (data: { sender: string; recipient: string }) => {
+    socket.on("messagesRead", (data: { reader: string }) => {
+      if (!data || !data.reader) return;
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.sender.toLowerCase() === data.sender.toLowerCase() &&
-          msg.recipient.toLowerCase() === data.recipient.toLowerCase()
+          msg && msg.recipient && msg.recipient.toLowerCase() === data.reader.toLowerCase()
             ? { ...msg, status: "read" }
             : msg
         )
@@ -1006,8 +1029,10 @@ export default function Home() {
 
     // Listen for delivery updates
     socket.on("messagesDelivered", (data: { sender: string; recipient: string }) => {
+      if (!data || !data.sender || !data.recipient) return;
       setMessages((prev) =>
         prev.map((msg) =>
+          msg && msg.sender && msg.recipient &&
           msg.sender.toLowerCase() === data.sender.toLowerCase() &&
           msg.recipient.toLowerCase() === data.recipient.toLowerCase() &&
           msg.status === "sent"
@@ -1138,6 +1163,9 @@ export default function Home() {
           recipient: currentUser.username
         })
       })
+      .then(() => {
+        fetchUnreadMessagesCount();
+      })
       .catch(err => console.warn("Error marking messages as read:", err));
 
       // Emit read status through WebSockets
@@ -1229,6 +1257,8 @@ export default function Home() {
                   reader: currentUser.username,
                   sender: data.from
                 });
+              } else {
+                fetchUnreadMessagesCount();
               }
             }
             setTimeout(() => scrollToBottom("smooth"), 50);
@@ -1243,6 +1273,7 @@ export default function Home() {
               )
             );
           }
+          fetchUnreadMessagesCount();
           break;
 
         case "TYPING":
@@ -1693,6 +1724,11 @@ export default function Home() {
   // Resolve chat relationship and status
   const activeRelationship = activeContact ? getChatRelationship(activeContact.username) : null;
   const isAccepted = activeRelationship?.status === "accepted";
+
+  const pendingRequestsCount = currentUser
+    ? messageRequests.filter(r => r.recipient.toLowerCase() === currentUser.username.toLowerCase() && r.status === 'pending').length
+    : 0;
+  const totalUnreadCount = unreadMessagesCount + pendingRequestsCount;
 
   // Filters messages for selected user
   const conversationMessages = messages.filter(
@@ -2461,39 +2497,52 @@ export default function Home() {
         </div>
 
         {/* Center Search bar */}
-        <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-          theme === "black"
-            ? "bg-[#0a0a0a] border-neutral-900"
-            : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
-        }`}>
-          <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="Search"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
-          />
-        </div>
+        {currentUser && (
+          <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
+            theme === "black"
+              ? "bg-[#0a0a0a] border-neutral-900"
+              : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
+          }`}>
+            <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
+            />
+          </div>
+        )}
 
         {/* Right Nav Icons */}
         <div className="flex items-center gap-5">
-          {/* Search Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-            </svg>
-          </button>
-          
-          {/* Direct Messages Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors relative">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-            </svg>
-            <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white">1</span>
-          </button>
+          {currentUser && (
+            <>
+              {/* Search Icon */}
+              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+                </svg>
+              </button>
+              
+              {/* Direct Messages Icon */}
+              <button 
+                onClick={() => setCurrentView("chat")}
+                className="text-slate-500 hover:text-slate-800 transition-colors relative"
+              >
+                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                </svg>
+                {totalUnreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white animate-pulse">
+                    {totalUnreadCount}
+                  </span>
+                )}
+              </button>
+            </>
+          )}
 
           {/* Theme Toggle Button */}
           <button
@@ -2522,63 +2571,61 @@ export default function Home() {
             )}
           </button>
 
-          {/* Settings gear icon */}
-          <button 
-            onClick={() => {
-              if (currentUser) {
-                setName(currentUser.username);
-                setUsername(currentUser.username);
-                setBio(currentUser.bio || "");
-                setAvatar(currentUser.avatarUrl);
-              }
-              setCurrentView("settings");
-            }}
-            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400 hover:scale-105 transition-all shadow-md shadow-cyan-500/5 active:scale-95 flex items-center gap-1.5 font-extrabold text-xs cursor-pointer"
-            title="Settings Dashboard"
-          >
-            <svg className="w-4.5 h-4.5 stroke-[2.2] animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <span className="hidden sm:inline">Profile Settings</span>
-          </button>
+          {currentUser && (
+            <>
+              {/* Settings gear icon */}
+              <button 
+                onClick={() => {
+                  if (currentUser) {
+                    setName(currentUser.username);
+                    setUsername(currentUser.username);
+                    setBio(currentUser.bio || "");
+                    setAvatar(currentUser.avatarUrl);
+                  }
+                  setCurrentView("settings");
+                }}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 hover:border-cyan-400 hover:scale-105 transition-all shadow-md shadow-cyan-500/5 active:scale-95 flex items-center gap-1.5 font-extrabold text-xs cursor-pointer"
+                title="Settings Dashboard"
+              >
+                <svg className="w-4.5 h-4.5 stroke-[2.2] animate-spin-slow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span className="hidden sm:inline">Profile Settings</span>
+              </button>
 
-          {/* Home Icon */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
-            </svg>
-          </button>
+              {/* Home Icon */}
+              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                </svg>
+              </button>
 
-          {/* Notifications Heart */}
-          <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-            <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-            </svg>
-          </button>
+              {/* Notifications Heart */}
+              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
+                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+                </svg>
+              </button>
 
-          {/* Logged in user avatar */}
-          {currentUser ? (
-            <div className="relative group cursor-pointer" onClick={() => {
-              if (currentUser) {
-                setName(currentUser.username);
-                setUsername(currentUser.username);
-                setBio(currentUser.bio || "");
-                setAvatar(currentUser.avatarUrl);
-              }
-              setCurrentView("settings");
-            }}>
-              <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
-              <img
-                src={currentUser.avatarUrl}
-                alt={currentUser.username}
-                className="relative w-8 h-8 rounded-full object-cover border border-black active:scale-95 transition-transform"
-              />
-            </div>
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 border border-white/20 flex items-center justify-center text-white">
-              <span className="text-[10px] font-bold">U</span>
-            </div>
+              {/* Logged in user avatar */}
+              <div className="relative group cursor-pointer" onClick={() => {
+                if (currentUser) {
+                  setName(currentUser.username);
+                  setUsername(currentUser.username);
+                  setBio(currentUser.bio || "");
+                  setAvatar(currentUser.avatarUrl);
+                }
+                setCurrentView("settings");
+              }}>
+                <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-400 to-indigo-500 opacity-60 blur-xs group-hover:opacity-100 transition duration-300" />
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.username}
+                  className="relative w-8 h-8 rounded-full object-cover border border-black active:scale-95 transition-transform"
+                />
+              </div>
+            </>
           )}
         </div>
       </header>

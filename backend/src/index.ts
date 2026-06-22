@@ -102,19 +102,34 @@ const seedDatabase = async () => {
     const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
     await User.deleteMany({ email: { $in: mockEmails } });
     await User.deleteMany({ email: { $not: /@gmail\.com$/i } });
-    console.log('Mock contacts and non-gmail users successfully removed!');
+    
+    // Clean up specific test/AI users
+    const targets = ['testgmail', 'jane.doe', 'krupali_custom'];
+    await User.deleteMany({ username: { $in: targets } });
+    console.log('Mock contacts, non-gmail, and test users successfully removed!');
 
-    // Clean up mock relationships
-    const mockUsernames = MOCK_CONTACTS.map(c => c.username);
+    // Get list of remaining active registered users
+    const activeUsers = await User.find({});
+    const activeUsernames = activeUsers.map(u => u.username);
+
+    // Clean up ghost requests involving deleted users
     await MessageRequest.deleteMany({
       $or: [
-        { sender: { $in: mockUsernames } },
-        { recipient: { $in: mockUsernames } }
+        { sender: { $nin: activeUsernames } },
+        { recipient: { $nin: activeUsernames } }
       ]
     });
-    console.log('Mock relationships successfully cleaned!');
+
+    // Clean up ghost messages involving deleted users
+    await Message.deleteMany({
+      $or: [
+        { sender: { $nin: activeUsernames } },
+        { recipient: { $nin: activeUsernames } }
+      ]
+    });
+    console.log('Ghost message requests and messages successfully cleaned!');
   } catch (err) {
-    console.error('Error cleaning up mock contacts:', err);
+    console.error('Error cleaning up database:', err);
   }
 };
 
@@ -565,6 +580,24 @@ app.put('/api/messages/read', async (req: Request, res: Response): Promise<any> 
     emitToUser(sender, 'messagesRead', { reader: recipient });
     
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get count of unread messages for a user
+app.get('/api/messages/unread-count', async (req: Request, res: Response): Promise<any> => {
+  const { user } = req.query;
+  if (!user) {
+    return res.status(400).json({ error: 'user query parameter is required' });
+  }
+
+  try {
+    const count = await Message.countDocuments({
+      recipient: user,
+      status: { $ne: 'read' }
+    });
+    res.json({ count });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
