@@ -34,6 +34,7 @@ import {
 // Types
 interface User {
   username: string;
+  email?: string;
   avatarUrl: string;
   category?: string;
   bio?: string;
@@ -1316,6 +1317,11 @@ export default function Home() {
     if (isAuthLoading) return;
 
     // Basic client-side validation
+    if (!regEmail.trim().toLowerCase().endsWith("@gmail.com")) {
+      setAuthError("Registration is restricted to original @gmail.com email addresses.");
+      return;
+    }
+
     if (regPassword.length < 6) {
       setAuthError("Password must be at least 6 characters.");
       return;
@@ -1440,11 +1446,7 @@ export default function Home() {
       .catch(err => console.error("Error saving message via REST fallback:", err));
     }
 
-    const isMock = MOCK_CONTACTS.some((c) => c.username === activeContact.username);
-    const isOffline = onlineUsers[activeContact.username] === "offline" || !onlineUsers[activeContact.username];
-    if (isMock && isOffline) {
-      triggerMockResponse(activeContact.username);
-    }
+    // Mock auto-reply triggered by MOCK_CONTACTS is disabled
   };
 
   // Simulated responses for offline directory contacts
@@ -1568,13 +1570,15 @@ export default function Home() {
         (msg.sender === activeContact.username && msg.recipient === currentUser.username))
   );
 
-  // Filters contacts list for sidebar search
+  // Filters contacts list for sidebar search (real humans with Gmail accounts only)
   const filteredContacts = registeredUsers.filter(
     (u) =>
       currentUser &&
       currentUser.username &&
       u &&
       u.username &&
+      u.email &&
+      u.email.toLowerCase().endsWith("@gmail.com") &&
       u.username.toLowerCase() !== currentUser.username.toLowerCase() &&
       u.username.toLowerCase().includes(searchQuery.toLowerCase())
   );

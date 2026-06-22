@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "react": ["../frontend/node_modules/react"],
+      "react/*": ["../frontend/node_modules/react/*"],
+      "react-dom": ["../frontend/node_modules/react-dom"],
+      "react-dom/*": ["../frontend/node_modules/react-dom/*"],
+      "next": ["../frontend/node_modules/next"],
+      "next/*": ["../frontend/node_modules/next/*"],
+      "socket.io-client": ["../frontend/node_modules/socket.io-client"],
+      "lucide-react": ["../frontend/node_modules/lucide-react"],
+      "lucide-react/*": ["../frontend/node_modules/lucide-react/*"],
+      "@/*": ["./*"]
+    },
+    "typeRoots": [
+      "../frontend/node_modules/@types"
+    ]
+  },
+  "include": [
+    "../frontend/next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": ["node_modules"]
+}

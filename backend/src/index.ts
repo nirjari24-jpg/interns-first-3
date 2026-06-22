@@ -95,13 +95,14 @@ const MOCK_CONTACTS = [
   }
 ];
 
-// Clean up default users from database to show only registered users
+// Clean up default users and non-gmail users from database to show only registered users
 const seedDatabase = async () => {
   try {
-    console.log('Cleaning up mock contacts from MongoDB to show only registered users...');
+    console.log('Cleaning up mock contacts and non-gmail users from MongoDB to show only registered users...');
     const mockEmails = MOCK_CONTACTS.map(c => c.email.toLowerCase());
     await User.deleteMany({ email: { $in: mockEmails } });
-    console.log('Mock contacts successfully removed!');
+    await User.deleteMany({ email: { $not: /@gmail\.com$/i } });
+    console.log('Mock contacts and non-gmail users successfully removed!');
 
     // Clean up mock relationships
     const mockUsernames = MOCK_CONTACTS.map(c => c.username);
@@ -340,6 +341,10 @@ app.post('/api/users/register', async (req: Request, res: Response): Promise<any
     return res.status(400).json({ error: 'Invalid email address' });
   }
 
+  if (!email.trim().toLowerCase().endsWith('@gmail.com')) {
+    return res.status(400).json({ error: 'Only Gmail addresses are allowed to register.' });
+  }
+
   try {
     // Check if email already exists
     const existingEmail = await User.findOne({ email: email.toLowerCase() });
@@ -427,7 +432,7 @@ app.post('/api/users/login', async (req: Request, res: Response): Promise<any> =
 // Get all users
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
-    const users = await User.find({});
+    const users = await User.find({ email: /@gmail\.com$/i });
     // Exclude password hashes when listing users
     const safeUsers = users.map(user => ({
       id: user._id.toString(),
