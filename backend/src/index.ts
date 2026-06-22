@@ -330,9 +330,14 @@ app.get('/api/health', (req: Request, res: Response) => {
 // USERS REST API
 // Register a new user
 app.post('/api/users/register', async (req: Request, res: Response): Promise<any> => {
-  const { username, email, password, avatarUrl, category, bio } = req.body;
-  if (!username || !email || !password) {
-    return res.status(400).json({ error: 'Username, email, and password are required' });
+  const { email, password, avatarUrl, category, bio } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email and password are required' });
+  }
+
+  const username = email.trim().split('@')[0];
+  if (!username) {
+    return res.status(400).json({ error: 'Invalid email address' });
   }
 
   try {

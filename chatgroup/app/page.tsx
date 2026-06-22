@@ -1305,7 +1305,14 @@ export default function Home() {
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError(null);
-    if (!regUsername.trim() || !regEmail.trim() || !regPassword) return;
+    if (!regEmail.trim() || !regPassword) return;
+
+    const generatedUsername = regEmail.trim().split('@')[0];
+    if (!generatedUsername) {
+      setAuthError("Invalid email address.");
+      return;
+    }
+
     if (isAuthLoading) return;
 
     // Basic client-side validation
@@ -1315,7 +1322,7 @@ export default function Home() {
     }
 
     const reqBody = {
-      username: regUsername.trim(),
+      username: generatedUsername,
       email: regEmail.trim().toLowerCase(),
       password: regPassword.trim(),  // trim to avoid accidental spaces
       avatarUrl: selectedAvatarUrl,
@@ -2584,22 +2591,6 @@ export default function Home() {
                       </button>
                     ))}
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Username</label>
-                  <input
-                    type="text"
-                    maxLength={30}
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="e.g. Ann"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
                 </div>
 
                 <div className="flex flex-col gap-2">
