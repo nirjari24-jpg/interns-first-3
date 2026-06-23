@@ -2,23 +2,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #1A1A2E;
-  --foreground: #E8E8F0;
-  --accent: #E8D44D;
-  --accent-hover: #F0E050;
-  --surface: #252540;
-  --surface-light: #2D2D4A;
-  --surface-dark: #16162A;
-  --border: #333355;
-  --border-light: #3D3D60;
-  --text-primary: #E8E8F0;
-  --text-secondary: #9090B0;
-  --text-muted: #6B6B8A;
-  --sent-bubble: #E8D44D;
-  --sent-text: #1A1A2E;
-  --received-bubble: #2D2D4A;
-  --received-text: #E8E8F0;
-  --nav-active: rgba(232, 212, 77, 0.12);
+  --background: #252529;
+  --foreground: #FFFFFF;
+  --accent: #E8EA7A;
+  --accent-hover: #F3F59B;
+  --surface: #2E2E33;
+  --surface-light: #35353B;
+  --surface-dark: #1F1F23;
+  --border: #2E2E33;
+  --border-light: #35353B;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A0A0;
+  --text-muted: #707075;
+  --sent-bubble: #3D1B5C;
+  --sent-text: #FFFFFF;
+  --received-bubble: #2E2E33;
+  --received-text: #FFFFFF;
+  --nav-active: rgba(232, 234, 122, 0.12);
   --nav-active-border: #E8D44D;
 }
 
@@ -30,7 +30,8 @@
 }
 
 body {
-  background: var(--background);
+  background: linear-gradient(135deg, #1E1E22 0%, #2B2B2F 100%);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: 'Inter', var(--font-sans), sans-serif;
   margin: 0;
