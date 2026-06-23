@@ -29,7 +29,8 @@ import {
   Check,
   AlertTriangle,
   Award,
-  Palette
+  Palette,
+  ShieldBan
 } from "lucide-react";
 
 // Types
@@ -64,6 +65,25 @@ interface MessageRequest {
   sender: string;
   recipient: string;
   status: 'pending' | 'accepted' | 'declined';
+}
+
+interface GroupMessage {
+  id: string;
+  sender: string;
+  senderAvatar: string;
+  text: string;
+  imageUrl?: string;
+  time: string;
+  isNew?: boolean;
+}
+
+interface GroupChat {
+  id: string;
+  name: string;
+  avatarColor: string;
+  members: string[];
+  messages: GroupMessage[];
+  createdAt: string;
 }
 
 // Preset Avatars for registration and mock contacts
@@ -174,10 +194,34 @@ export default function Home() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Switch tabs in sidebar
-  const [activeSection, setActiveSection] = useState("profile"); // "profile", "security"
+  const [activeSection, setActiveSection] = useState("profile"); // "profile", "security", "appearance", "blocked"
 
   // 2FA state
   const [twoFactor, setTwoFactor] = useState(false);
+
+  // Blocked users state
+  const [blockedUsers, setBlockedUsers] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chatgroup_blocked_users");
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
+  // Persist blocked users
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chatgroup_blocked_users", JSON.stringify(blockedUsers));
+    }
+  }, [blockedUsers]);
+
+  const toggleBlockUser = (username: string) => {
+    setBlockedUsers(prev =>
+      prev.includes(username) ? prev.filter(u => u !== username) : [...prev, username]
+    );
+  };
+
+  const isUserBlocked = (username: string) => blockedUsers.includes(username);
 
   // Status Alerts
   const [toast, setToast] = useState<string | null>(null);
@@ -215,6 +259,22 @@ export default function Home() {
     }
     return "default";
   });
+
+  // Group Chat states
+  const GROUP_AVATAR_COLORS = ["#E53E3E", "#DD6B20", "#38A169", "#3182CE", "#805AD5", "#D53F8C", "#319795", "#E8EA7A"];
+  const [groups, setGroups] = useState<GroupChat[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chatgroup_groups");
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+  const [activeGroup, setActiveGroup] = useState<GroupChat | null>(null);
+  const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [selectedGroupMembers, setSelectedGroupMembers] = useState<string[]>([]);
+  const [groupInputText, setGroupInputText] = useState("");
+  const [groupSearchQuery, setGroupSearchQuery] = useState("");
 
   const getChatBgStyles = () => {
     switch (chatBackground) {
@@ -422,6 +482,70 @@ export default function Home() {
       default:
         return isMe ? { className: defaultMe } : { className: defaultOther };
     }
+  };
+
+  // --- Group Chat Helpers ---
+  // Persist groups to localStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chatgroup_groups", JSON.stringify(groups));
+    }
+  }, [groups]);
+
+  // Keep activeGroup in sync with groups array (e.g. after new messages)
+  useEffect(() => {
+    if (activeGroup) {
+      const updated = groups.find(g => g.id === activeGroup.id);
+      if (updated) setActiveGroup(updated);
+    }
+  }, [groups]);
+
+  const createGroup = () => {
+    if (!newGroupName.trim() || selectedGroupMembers.length === 0 || !currentUser) return;
+    const newGroup: GroupChat = {
+      id: `group_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name: newGroupName.trim(),
+      avatarColor: GROUP_AVATAR_COLORS[groups.length % GROUP_AVATAR_COLORS.length],
+      members: [currentUser.username, ...selectedGroupMembers],
+      messages: [],
+      createdAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    };
+    setGroups(prev => [newGroup, ...prev]);
+    setActiveGroup(newGroup);
+    setNewGroupName("");
+    setSelectedGroupMembers([]);
+    setIsCreateGroupModalOpen(false);
+  };
+
+  const sendGroupMessage = (groupId: string, text: string) => {
+    if (!text.trim() || !currentUser) return;
+    const newMsg: GroupMessage = {
+      id: `gmsg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      sender: currentUser.username,
+      senderAvatar: currentUser.avatarUrl,
+      text: text.trim(),
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      isNew: true,
+    };
+    setGroups(prev => prev.map(g => g.id === groupId ? { ...g, messages: [...g.messages, newMsg] } : g));
+    setGroupInputText("");
+  };
+
+  const getGroupLastMessage = (group: GroupChat) => {
+    if (group.messages.length === 0) return { text: "No messages yet", time: group.createdAt };
+    const last = group.messages[group.messages.length - 1];
+    const senderPrefix = last.sender === currentUser?.username ? "You" : last.sender.split(" ")[0];
+    return { text: `${senderPrefix}: ${last.text}`, time: last.time };
+  };
+
+  const getGroupInitials = (name: string) => {
+    return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  };
+
+  const toggleGroupMember = (username: string) => {
+    setSelectedGroupMembers(prev =>
+      prev.includes(username) ? prev.filter(m => m !== username) : [...prev, username]
+    );
   };
   
   // Emoji Picker states
@@ -2323,6 +2447,18 @@ export default function Home() {
                   </button>
 
                   <button
+                    onClick={() => setActiveSection("blocked")}
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
+                      activeSection === "blocked"
+                        ? "bg-red-500/10 text-red-500 border-red-500/20 shadow-sm shadow-red-500/5"
+                        : "bg-transparent border-transparent text-slate-400 hover:text-[#FFFFFF] hover:bg-[#35353B]/50"
+                    }`}
+                  >
+                    <ShieldBan className="w-4.5 h-4.5" />
+                    <span>Blocked Users</span>
+                  </button>
+
+                  <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
                   >
@@ -2430,6 +2566,20 @@ export default function Home() {
                 >
                   <Palette className="w-4 h-4" />
                   <span>Appearance</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveSection("blocked")}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
+                    activeSection === "blocked"
+                      ? isDark ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                        : "bg-red-50 text-red-600 border border-red-200"
+                      : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
+                  }`}
+                >
+                  <ShieldBan className="w-4 h-4" />
+                  <span className="hidden sm:inline">Blocked</span>
                 </button>
               </div>
 
@@ -3302,6 +3452,72 @@ export default function Home() {
                   </button>
                 </div>
               </div>
+              {activeSection === "blocked" && (
+                <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
+                  isDark ? "bg-[#1A1A1E]/95 border-slate-800" : "bg-white border-slate-200 shadow-md"
+                }`}>
+                  <div className="border-b border-slate-800/40 pb-4 flex items-center justify-between select-none mb-6">
+                    <div className="flex items-center gap-2">
+                      <ShieldBan className="w-5 h-5 text-red-500" />
+                      <h2 className="text-lg font-black tracking-wide">Blocked Users</h2>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+                      Blocked users will not be able to send you messages or view your online status.
+                    </p>
+
+                    {blockedUsers.length === 0 ? (
+                      <div className={`flex flex-col items-center justify-center py-12 rounded-2xl border border-dashed ${
+                        isDark ? "border-[#2E2E33] bg-[#252529]/50" : "border-slate-300 bg-slate-50"
+                      }`}>
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${isDark ? "bg-[#2E2E33]" : "bg-slate-200"}`}>
+                          <ShieldBan className="w-6 h-6 text-slate-400" />
+                        </div>
+                        <p className={`text-sm font-bold ${isDark ? "text-slate-300" : "text-slate-600"}`}>No blocked users</p>
+                        <p className={`text-xs mt-1 ${isDark ? "text-slate-500" : "text-slate-400"}`}>You haven't blocked anyone yet.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 mt-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                        {blockedUsers.map((username) => {
+                          const contact = registeredUsers.find(u => u.username === username);
+                          return (
+                            <div 
+                              key={username}
+                              className={`flex items-center justify-between p-3 rounded-2xl border ${
+                                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-sm"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                {contact ? (
+                                  <img src={contact.avatarUrl} alt={username} className="w-10 h-10 rounded-full object-cover" />
+                                ) : (
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-200 text-slate-600"}`}>
+                                    {username[0]}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className={`text-[13px] font-bold ${isDark ? "text-slate-200" : "text-slate-800"}`}>{username}</div>
+                                  <div className="text-[10px] text-slate-500">{contact ? contact.email : "Unknown user"}</div>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => toggleBlockUser(username)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                  isDark ? "bg-[#2E2E33] hover:bg-[#35353B] text-slate-300" : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                }`}
+                              >
+                                Unblock
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -3802,6 +4018,71 @@ export default function Home() {
                     );
                   })
                 )
+              ) : navView === "group" ? (
+                <div className="flex flex-col gap-2">
+                  {/* Make a Group Button */}
+                  <button
+                    onClick={() => { setIsCreateGroupModalOpen(true); setNewGroupName(""); setSelectedGroupMembers([]); setGroupSearchQuery(""); }}
+                    className="mx-2 mb-1 px-4 py-3 rounded-2xl text-[13px] font-extrabold flex items-center justify-center gap-2.5 transition-all active:scale-[0.97] cursor-pointer bg-gradient-to-r from-[#E8EA7A] to-[#D2D45E] hover:brightness-110 text-[#1E1E22] shadow-md shadow-[#E8EA7A]/15"
+                  >
+                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                    </svg>
+                    Make a Group
+                  </button>
+
+                  {groups.length === 0 ? (
+                    <div className="p-8 text-center flex flex-col items-center gap-3">
+                      <div className={`w-14 h-14 rounded-full flex items-center justify-center ${isDark ? "bg-[#2E2E33]" : "bg-slate-100"}`}>
+                        <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                        </svg>
+                      </div>
+                      <p className="text-[11px] text-slate-500 max-w-[180px] leading-relaxed">No groups yet. Create one to start chatting with multiple people!</p>
+                    </div>
+                  ) : (
+                    groups.map((group) => {
+                      const lastMsg = getGroupLastMessage(group);
+                      const isActive = activeGroup?.id === group.id;
+                      return (
+                        <button
+                          key={group.id}
+                          onClick={() => { setActiveGroup(group); setActiveContact(null); }}
+                          className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 cursor-pointer ${
+                            isActive
+                              ? isDark ? "bg-[#2E2E33] border border-[#2E2E33]" : "bg-[#E8E8F0] border border-[#D0D0DA]"
+                              : isDark ? "hover:bg-[#2E2E33]/60 border border-transparent" : "hover:bg-[#E0E0EA]/50 border border-transparent"
+                          }`}
+                        >
+                          {/* Group Avatar */}
+                          <div
+                            className="w-[44px] h-[44px] rounded-full flex items-center justify-center text-white font-extrabold text-[14px] flex-shrink-0 shadow-sm"
+                            style={{ backgroundColor: group.avatarColor }}
+                          >
+                            {getGroupInitials(group.name)}
+                          </div>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex justify-between items-baseline">
+                              <span className={`text-[13px] font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>
+                                {group.name}
+                              </span>
+                              <span className="text-[9.5px] text-slate-500 flex-shrink-0 ml-2">{lastMsg.time}</span>
+                            </div>
+                            <div className="flex justify-between items-center mt-0.5">
+                              <span className="text-[11px] text-slate-500 truncate max-w-[140px]">{lastMsg.text}</span>
+                              <span className="text-[9px] text-slate-500 flex-shrink-0 ml-1">
+                                <svg className="w-3 h-3 inline-block mr-0.5 -mt-px" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                                </svg>
+                                {group.members.length}
+                              </span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               ) : (
                 filteredContacts.length === 0 ? (
                   <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
@@ -3903,19 +4184,179 @@ export default function Home() {
             </button>
           </section>
 
-          {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM */}
+          {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM / GROUP CHAT */}
           <main 
             className={`flex-1 flex flex-col border-r transition-all duration-300 ${
               theme === "black"
                 ? "bg-black border-neutral-900"
                 : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
             } ${
-              !activeContact 
+              !activeContact && !(activeGroup && navView === "group")
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
                 : "flex h-full"
             }`}
           >
-            {activeContact ? (
+            {activeGroup && navView === "group" ? (
+              /* ===== GROUP CHAT VIEW ===== */
+              <>
+                {/* Group Chat Header */}
+                <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
+                  theme === "black"
+                    ? "bg-black border-neutral-900"
+                    : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <button 
+                      onClick={() => setActiveGroup(null)}
+                      className="md:hidden p-1.5 rounded-full text-slate-500 hover:text-slate-800 active:scale-95"
+                    >
+                      <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                      </svg>
+                    </button>
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-extrabold text-[13px] flex-shrink-0 shadow-sm"
+                      style={{ backgroundColor: activeGroup.avatarColor }}
+                    >
+                      {getGroupInitials(activeGroup.name)}
+                    </div>
+                    <div>
+                      <h3 className={`text-sm font-bold ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>{activeGroup.name}</h3>
+                      <p className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
+                        {activeGroup.members.length} members
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {/* Stacked Member Avatars */}
+                    <div className="flex -space-x-2">
+                      {activeGroup.members.slice(0, 4).map((memberName, idx) => {
+                        const memberUser = registeredUsers.find(u => u.username === memberName);
+                        return memberUser ? (
+                          <img
+                            key={memberName}
+                            src={memberUser.avatarUrl}
+                            alt={memberName}
+                            title={memberName}
+                            className="w-7 h-7 rounded-full object-cover border-2 shadow-sm"
+                            style={{ borderColor: isDark ? "#2E2E33" : "#fff", zIndex: 10 - idx }}
+                          />
+                        ) : (
+                          <div
+                            key={memberName}
+                            title={memberName}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-bold text-white border-2 shadow-sm"
+                            style={{ backgroundColor: "#6B6B8A", borderColor: isDark ? "#2E2E33" : "#fff", zIndex: 10 - idx }}
+                          >
+                            {memberName[0]}
+                          </div>
+                        );
+                      })}
+                      {activeGroup.members.length > 4 && (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-extrabold border-2 shadow-sm"
+                          style={{ backgroundColor: isDark ? "#3F3F46" : "#E5E7EB", color: isDark ? "#A1A1AA" : "#6B7280", borderColor: isDark ? "#2E2E33" : "#fff", zIndex: 5 }}
+                        >
+                          +{activeGroup.members.length - 4}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </header>
+
+                {/* Group Messages Area */}
+                <div
+                  className={`flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar flex flex-col ${
+                    chatBackground === "default" 
+                      ? theme === "black" ? "bg-black" : isDark ? "bg-[#252529]" : "bg-[#F5F5FA]"
+                      : ""
+                  }`}
+                  style={chatBackground === "default" ? {} : getChatBgStyles()}
+                >
+                  {activeGroup.messages.length === 0 ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center select-none">
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 ${isDark ? "bg-[#2E2E33]" : "bg-slate-100"}`}>
+                        <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" strokeWidth="1.3" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155" />
+                        </svg>
+                      </div>
+                      <p className={`text-[11px] font-semibold ${isDark ? "text-slate-500" : "text-slate-400"}`}>Start a conversation in this group!</p>
+                      <p className={`text-[10px] mt-1 ${isDark ? "text-slate-600" : "text-slate-400"}`}>Type a message below to get things going.</p>
+                    </div>
+                  ) : (
+                    activeGroup.messages.map((msg) => {
+                      const isMe = msg.sender === currentUser?.username;
+                      const bubbleConfig = getMessageBubbleStyles(isMe);
+                      const shapeClass = isMe ? "rounded-br-sm shadow-sm" : "rounded-bl-sm border";
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`flex w-full items-end gap-2.5 group/msg relative ${
+                            isMe ? "justify-end" : "justify-start"
+                          } ${msg.isNew ? "animate-chat-bubble" : ""}`}
+                        >
+                          {!isMe && (
+                            <img
+                              src={msg.senderAvatar}
+                              alt={msg.sender}
+                              className="w-[28px] h-[28px] rounded-full object-cover border border-slate-200 flex-shrink-0 select-none mb-1"
+                            />
+                          )}
+                          <div className="flex flex-col max-w-[70%]">
+                            {!isMe && (
+                              <span className={`text-[10px] font-bold mb-0.5 ml-1 ${isDark ? "text-[#E8EA7A]" : "text-[#9A9C2D]"}`}>
+                                {msg.sender}
+                              </span>
+                            )}
+                            <div
+                              className={`px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words relative ${shapeClass} ${bubbleConfig.className || ""}`}
+                              style={bubbleConfig.style || {}}
+                            >
+                              {msg.text && <p className="font-normal">{msg.text}</p>}
+                              <div className="flex items-center justify-end mt-1 text-[9px] font-medium select-none gap-1">
+                                <span className="opacity-75">{msg.time}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {/* Group Message Input */}
+                <div className={`p-4 border-t flex-shrink-0 z-40 ${isDark ? "bg-[#1A1A1E] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"}`}>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 relative">
+                      <input
+                        type="text"
+                        value={groupInputText}
+                        onChange={(e) => setGroupInputText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && activeGroup) {
+                            sendGroupMessage(activeGroup.id, groupInputText);
+                          }
+                        }}
+                        placeholder="Type a group message..."
+                        className={`w-full pl-4 pr-12 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
+                          isDark ? "bg-[#04060a] border-[#2E2E33] text-white placeholder-slate-500 focus:border-sky-500/50 focus:ring-sky-500/5" 
+                            : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50 focus:ring-sky-500/5"
+                        }`}
+                      />
+                      <button
+                        onClick={() => activeGroup && sendGroupMessage(activeGroup.id, groupInputText)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-xl bg-[#E8EA7A] text-[#1E1E22] hover:bg-[#F3F59B] flex items-center justify-center active:scale-95 hover:scale-105 transition-all shadow-md shadow-[#E8EA7A]/20 rounded-full cursor-pointer"
+                        disabled={!groupInputText.trim()}
+                      >
+                        <svg className="w-[15px] h-[15px] rotate-45 -translate-x-[0.5px] stroke-[2.8] text-[#1E1E22]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : activeContact ? (
               <>
                 {/* Active Chat Header */}
                 <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
@@ -4245,7 +4686,21 @@ export default function Home() {
                 </div>
 
                 {/* Floating input dock or Message Request Panel */}
-                {isAccepted ? (
+                {isUserBlocked(activeContact.username) ? (
+                  <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
+                    <div className={`p-4 rounded-2xl border flex flex-col items-center justify-center text-center gap-2 shadow-lg ${
+                      isDark ? "bg-[#1A1A1E]/95 border-red-500/20 shadow-red-500/5" : "bg-white/95 border-red-200 shadow-red-500/5"
+                    }`}>
+                      <ShieldBan className="w-6 h-6 text-red-500" />
+                      <p className={`text-xs font-bold ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+                        You have blocked {activeContact.username}.
+                      </p>
+                      <p className={`text-[10px] ${isDark ? "text-slate-500" : "text-slate-500"}`}>
+                        Unblock this user from settings or the contact details panel to send messages.
+                      </p>
+                    </div>
+                  </div>
+                ) : isAccepted ? (
                   <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
                     {/* Message Action Preview Bar */}
                     {(replyingToMessage || editingMessage) && (
@@ -4494,9 +4949,14 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                   </svg>
                 </div>
-                <h2 className="text-[17px] font-bold text-slate-500 uppercase tracking-widest">Your Messages</h2>
+                <h2 className="text-[17px] font-bold text-slate-500 uppercase tracking-widest">
+                  {navView === "group" ? "Group Chats" : "Your Messages"}
+                </h2>
                 <p className="text-[12px] text-slate-450 max-w-[240px] mt-2 leading-relaxed">
-                  Send private messages and media photos to a friend or group. Select a conversation to start.
+                  {navView === "group" 
+                    ? "Create a group or select an existing one to start chatting with your team."
+                    : "Send private messages and media photos to a friend or group. Select a conversation to start."
+                  }
                 </p>
               </div>
             )}
@@ -4585,6 +5045,20 @@ export default function Home() {
                     </button>
                   )}
                 </div>
+
+                {isAccepted && (
+                  <button
+                    onClick={() => toggleBlockUser(activeContact.username)}
+                    className={`mt-8 w-full py-3.5 rounded-2xl font-extrabold text-xs tracking-wider active:scale-95 transition-all uppercase cursor-pointer flex items-center justify-center gap-2 ${
+                      isUserBlocked(activeContact.username)
+                        ? "bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300"
+                        : "bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20"
+                    }`}
+                  >
+                    <ShieldBan className="w-4 h-4" />
+                    {isUserBlocked(activeContact.username) ? "Unblock User" : "Block User"}
+                  </button>
+                )}
               </div>
             </aside>
           )}
@@ -5005,6 +5479,160 @@ export default function Home() {
                   </button>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Group Modal */}
+      {isCreateGroupModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsCreateGroupModalOpen(false)}
+          />
+          {/* Modal */}
+          <div className={`relative w-full max-w-[420px] rounded-3xl border shadow-2xl overflow-hidden animate-chat-bubble ${
+            isDark 
+              ? "bg-[#1A1A1E]/95 border-[#2E2E33] backdrop-blur-xl shadow-black/40" 
+              : "bg-white/95 border-slate-200 backdrop-blur-xl shadow-slate-300/40"
+          }`}>
+            {/* Header */}
+            <div className={`px-6 pt-6 pb-4 border-b ${isDark ? "border-[#2E2E33]" : "border-slate-100"}`}>
+              <div className="flex items-center justify-between">
+                <h2 className={`text-[16px] font-extrabold ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>
+                  Create New Group
+                </h2>
+                <button
+                  onClick={() => setIsCreateGroupModalOpen(false)}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 cursor-pointer ${
+                    isDark ? "hover:bg-[#2E2E33] text-slate-400" : "hover:bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Group Name Input */}
+              <div className="mt-4">
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                  Group Name
+                </label>
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="e.g. Design Team, Study Group..."
+                  className={`w-full mt-1.5 px-4 py-2.5 rounded-xl text-sm font-medium outline-none border transition-all focus:ring-2 ${
+                    isDark 
+                      ? "bg-[#252529] border-[#2E2E33] text-[#E8E8F0] placeholder-slate-600 focus:border-[#E8EA7A]/40 focus:ring-[#E8EA7A]/10" 
+                      : "bg-slate-50 border-slate-200 text-[#252529] placeholder-slate-400 focus:border-[#E8EA7A]/60 focus:ring-[#E8EA7A]/10"
+                  }`}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {/* Selected Members Chips */}
+            {selectedGroupMembers.length > 0 && (
+              <div className={`px-6 py-3 border-b flex flex-wrap gap-1.5 ${isDark ? "border-[#2E2E33]" : "border-slate-100"}`}>
+                {selectedGroupMembers.map(member => (
+                  <span
+                    key={member}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10.5px] font-bold border transition-all ${
+                      isDark
+                        ? "bg-[#E8EA7A]/10 text-[#E8EA7A] border-[#E8EA7A]/20"
+                        : "bg-[#E8EA7A]/15 text-[#7A7C1D] border-[#E8EA7A]/30"
+                    }`}
+                  >
+                    {member}
+                    <button
+                      onClick={() => toggleGroupMember(member)}
+                      className="w-3.5 h-3.5 rounded-full flex items-center justify-center hover:bg-red-500/20 text-current transition-all cursor-pointer"
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Members Search */}
+            <div className={`px-6 pt-3 ${isDark ? "" : ""}`}>
+              <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? "text-slate-500" : "text-slate-400"}`}>
+                Add Members ({selectedGroupMembers.length} selected)
+              </label>
+              <div className={`mt-1.5 flex items-center gap-2 px-3 py-2 border rounded-xl ${
+                isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-slate-50 border-slate-200"
+              }`}>
+                <svg className="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+                </svg>
+                <input
+                  type="text"
+                  value={groupSearchQuery}
+                  onChange={(e) => setGroupSearchQuery(e.target.value)}
+                  placeholder="Search contacts..."
+                  className={`bg-transparent text-xs w-full outline-none ${isDark ? "text-[#E8E8F0] placeholder-slate-600" : "text-[#252529] placeholder-slate-400"}`}
+                />
+              </div>
+            </div>
+
+            {/* Member List */}
+            <div className="px-4 py-3 max-h-[220px] overflow-y-auto custom-scrollbar space-y-0.5">
+              {filteredContacts
+                .filter(u => u.username.toLowerCase().includes(groupSearchQuery.toLowerCase()))
+                .map(user => {
+                  const isSelected = selectedGroupMembers.includes(user.username);
+                  return (
+                    <button
+                      key={user.username}
+                      onClick={() => toggleGroupMember(user.username)}
+                      className={`w-full flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer ${
+                        isSelected
+                          ? isDark ? "bg-[#E8EA7A]/8 border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 border border-[#E8EA7A]/20"
+                          : isDark ? "hover:bg-[#2E2E33]/60 border border-transparent" : "hover:bg-slate-50 border border-transparent"
+                      }`}
+                    >
+                      <img src={user.avatarUrl} alt={user.username} className="w-9 h-9 rounded-full object-cover border border-slate-200/30 flex-shrink-0" />
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className={`text-[12px] font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>{user.username}</div>
+                        <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                        isSelected
+                          ? "bg-[#E8EA7A] border-[#E8EA7A]"
+                          : isDark ? "border-slate-600" : "border-slate-300"
+                      }`}>
+                        {isSelected && (
+                          <svg className="w-3 h-3 text-[#1E1E22]" fill="none" stroke="currentColor" strokeWidth="3.5" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+
+            {/* Footer */}
+            <div className={`px-6 py-4 border-t ${isDark ? "border-[#2E2E33]" : "border-slate-100"}`}>
+              <button
+                onClick={createGroup}
+                disabled={!newGroupName.trim() || selectedGroupMembers.length === 0}
+                className={`w-full py-3 rounded-2xl text-[13px] font-extrabold transition-all active:scale-[0.97] cursor-pointer ${
+                  newGroupName.trim() && selectedGroupMembers.length > 0
+                    ? "bg-gradient-to-r from-[#E8EA7A] to-[#D2D45E] hover:brightness-110 text-[#1E1E22] shadow-md shadow-[#E8EA7A]/15"
+                    : isDark ? "bg-[#2E2E33] text-slate-600 cursor-not-allowed" : "bg-slate-100 text-slate-400 cursor-not-allowed"
+                }`}
+              >
+                Create Group ({selectedGroupMembers.length} member{selectedGroupMembers.length !== 1 ? "s" : ""})
+              </button>
             </div>
           </div>
         </div>
