@@ -269,6 +269,20 @@ export default function Home() {
           backgroundPosition: "right bottom",
           backgroundRepeat: "no-repeat"
         };
+      case "cute-retro":
+        return {
+          backgroundImage: "url('/cute_retro.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "retro-blobs":
+        return {
+          backgroundImage: "url('/retro_blobs.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
       case "nude-cream":
         return { backgroundColor: "#FAF8F5" };
       case "nude-sand":
@@ -2917,6 +2931,62 @@ export default function Home() {
                         </div>
                         <span className="text-xs.5 font-bold">Cute Chibi</span>
                         <span className="text-[9px] text-slate-500 mt-0.5">Pastel pink chibi strawberry cupcake theme</span>
+                      </button>
+
+                      {/* Cute Retro Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("cute-retro");
+                          localStorage.setItem("chatgroup_background", "cute-retro");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "cute-retro"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/cute_retro.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Cute Retro</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Cute Retro</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Pink retro character with abstract wavy blobs</span>
+                      </button>
+
+                      {/* Retro Blobs Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("retro-blobs");
+                          localStorage.setItem("chatgroup_background", "retro-blobs");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "retro-blobs"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/retro_blobs.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-800 bg-white/70 px-2 py-1 rounded">Retro Blobs</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Retro Blobs</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Terracotta, beige, and blue organic shape layers</span>
                       </button>
                     </div>
                   </div>
