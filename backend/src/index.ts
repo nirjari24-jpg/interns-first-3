@@ -628,7 +628,9 @@ app.put('/api/messages/:id', async (req: Request, res: Response): Promise<any> =
 // Mark messages as read
 app.put('/api/messages/read', async (req: Request, res: Response): Promise<any> => {
   const { sender, recipient } = req.body;
+  console.log('PUT /api/messages/read called with body:', req.body);
   if (!sender || !recipient) {
+    console.warn('PUT /api/messages/read missing sender or recipient:', { sender, recipient });
     return res.status(400).json({ error: 'sender and recipient are required' });
   }
 
