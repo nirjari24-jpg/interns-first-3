@@ -2205,10 +2205,7 @@ export default function Home() {
               >
                 <ArrowRight className="w-4.5 h-4.5 rotate-180" />
               </button>
-              
-              <div className="w-12 h-12 rounded-2xl bg-[#E8EA7A]/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0 text-[#E8EA7A] shadow-inner">
-                <Fingerprint className="w-6 h-6 animate-pulse" />
-              </div>
+
               <div>
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight">
                   <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#A0A0A0] to-[#FFFFFF] dark:from-white dark:to-slate-400 from-slate-950 to-slate-700">
@@ -2314,8 +2311,8 @@ export default function Home() {
                     onClick={() => setActiveSection("appearance")}
                     className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
                       activeSection === "appearance"
-                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
-                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
+                        ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15 shadow-sm shadow-[#E8EA7A]/5"
+                        : "bg-transparent border-transparent text-slate-400 hover:text-[#FFFFFF] hover:bg-[#35353B]/50"
                     }`}
                   >
                     <Palette className="w-4.5 h-4.5" />
@@ -2334,55 +2331,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-[#E8EA7A]/5 rounded-full blur-[20px] pointer-events-none" />
 
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-[#E8EA7A]" />
-                  <h3 className={`text-xs font-extrabold uppercase tracking-wider ${isDark ? "text-slate-350" : "text-black"}`}>Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className={`text-[10px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="lg:col-span-8 w-full space-y-4">
@@ -2423,8 +2372,8 @@ export default function Home() {
                   onClick={() => setActiveSection("appearance")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "appearance"
-                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200"
+                      ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15"
+                        : "bg-[#E8EA7A]/10 text-[#E8EA7A] border border-[#E8EA7A]/20"
                       : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
                 >
@@ -2696,7 +2645,7 @@ export default function Home() {
                 }`}>
                   <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none mb-6">
                     <div className="flex items-center gap-2">
-                      <Palette className="w-5 h-5 text-cyan-400" />
+                      <Palette className="w-5 h-5 text-[#E8EA7A]" />
                       <h2 className="text-lg font-black tracking-wide">Chat Appearance</h2>
                     </div>
                     <span className="text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-bold">Theme Settings</span>
@@ -2717,7 +2666,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "default" || !chatBackground
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2739,7 +2688,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "starry"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2767,7 +2716,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-minimalist"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2795,7 +2744,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-cream"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2815,7 +2764,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-sand"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2835,7 +2784,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-tan"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2855,7 +2804,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-rose"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2875,7 +2824,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "solid-dark"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2895,7 +2844,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "sunset"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2920,7 +2869,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "aurora-glow"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2948,7 +2897,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cyberpunk-neon"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2976,7 +2925,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "forest-mist"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3004,7 +2953,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-shinchan"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3033,7 +2982,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-chibi"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3062,7 +3011,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-retro"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3090,7 +3039,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "retro-blobs"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3118,7 +3067,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nature-lake"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3146,7 +3095,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "rainy-weather"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3174,7 +3123,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "tangled"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3202,7 +3151,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "bows-pattern"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3230,7 +3179,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "spiderman"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3253,55 +3202,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className={`block lg:hidden border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-[#E8EA7A]/5 rounded-full blur-[20px] pointer-events-none" />
 
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-[#E8EA7A]" />
-                  <h3 className="text-xs font-extrabold uppercase text-slate-350 tracking-wider">Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

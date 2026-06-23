@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ChatGroup - Real-Time Messenger",
+  title: "Chitchat - Real-Time Messenger",
   description: "A premium real-time direct messaging application.",
 };
 

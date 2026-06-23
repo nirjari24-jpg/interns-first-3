@@ -149,7 +149,7 @@ export default function Home() {
 
   // Navigation View State
   const [currentView, setCurrentView] = useState("chat"); // "chat" or "settings"
-  const [navView, setNavView] = useState<"chat" | "group" | "settings">("chat"); // left nav sidebar active view
+  const [navView, setNavView] = useState<"chat" | "group" | "calls" | "settings">("chat"); // left nav sidebar active view
 
   // Settings Theme
   const [theme, setTheme] = useState<"light" | "dark" | "black">("dark"); // "dark", "light", or "black"
@@ -2205,10 +2205,7 @@ export default function Home() {
               >
                 <ArrowRight className="w-4.5 h-4.5 rotate-180" />
               </button>
-              
-              <div className="w-12 h-12 rounded-2xl bg-[#E8EA7A]/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0 text-[#E8EA7A] shadow-inner">
-                <Fingerprint className="w-6 h-6 animate-pulse" />
-              </div>
+
               <div>
                 <h1 className="text-2xl md:text-3xl font-black tracking-tight">
                   <span className="bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#A0A0A0] to-[#FFFFFF] dark:from-white dark:to-slate-400 from-slate-950 to-slate-700">
@@ -2314,8 +2311,8 @@ export default function Home() {
                     onClick={() => setActiveSection("appearance")}
                     className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
                       activeSection === "appearance"
-                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
-                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
+                        ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15 shadow-sm shadow-[#E8EA7A]/5"
+                        : "bg-transparent border-transparent text-slate-400 hover:text-[#FFFFFF] hover:bg-[#35353B]/50"
                     }`}
                   >
                     <Palette className="w-4.5 h-4.5" />
@@ -2334,55 +2331,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-[#E8EA7A]/5 rounded-full blur-[20px] pointer-events-none" />
 
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-[#E8EA7A]" />
-                  <h3 className={`text-xs font-extrabold uppercase tracking-wider ${isDark ? "text-slate-350" : "text-black"}`}>Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className={`text-[10px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
             </div>
 
             <div className="lg:col-span-8 w-full space-y-4">
@@ -2423,8 +2372,8 @@ export default function Home() {
                   onClick={() => setActiveSection("appearance")}
                   className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
                     activeSection === "appearance"
-                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200"
+                      ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15"
+                        : "bg-[#E8EA7A]/10 text-[#E8EA7A] border border-[#E8EA7A]/20"
                       : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
                   }`}
                 >
@@ -2696,7 +2645,7 @@ export default function Home() {
                 }`}>
                   <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none mb-6">
                     <div className="flex items-center gap-2">
-                      <Palette className="w-5 h-5 text-cyan-400" />
+                      <Palette className="w-5 h-5 text-[#E8EA7A]" />
                       <h2 className="text-lg font-black tracking-wide">Chat Appearance</h2>
                     </div>
                     <span className="text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-bold">Theme Settings</span>
@@ -2717,7 +2666,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "default" || !chatBackground
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2739,7 +2688,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "starry"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2767,7 +2716,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-minimalist"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2795,7 +2744,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-cream"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2815,7 +2764,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-sand"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2835,7 +2784,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-tan"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2855,7 +2804,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nude-rose"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2875,7 +2824,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "solid-dark"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2895,7 +2844,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "sunset"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2920,7 +2869,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "aurora-glow"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2948,7 +2897,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cyberpunk-neon"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -2976,7 +2925,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "forest-mist"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3004,7 +2953,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-shinchan"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3033,7 +2982,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-chibi"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3062,7 +3011,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "cute-retro"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3090,7 +3039,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "retro-blobs"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3118,7 +3067,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "nature-lake"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3146,7 +3095,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "rainy-weather"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3174,7 +3123,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "tangled"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3202,7 +3151,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "bows-pattern"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3230,7 +3179,7 @@ export default function Home() {
                         }}
                         className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
                           chatBackground === "spiderman"
-                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            ? "border-[#E8EA7A]/80 bg-[#E8EA7A]/5 shadow-[0_8px_20px_rgba(232,234,122,0.15)]"
                             : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
                         }`}
                       >
@@ -3253,55 +3202,7 @@ export default function Home() {
                 </div>
               )}
 
-              <div className={`block lg:hidden border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-[#E8EA7A]/5 rounded-full blur-[20px] pointer-events-none" />
 
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-[#E8EA7A]" />
-                  <h3 className="text-xs font-extrabold uppercase text-slate-350 tracking-wider">Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -3336,55 +3237,8 @@ export default function Home() {
           </span>
         </div>
 
-        {/* Center Search bar */}
-        {currentUser && (
-          <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-            theme === "black"
-              ? "bg-[#0a0a0a] border-neutral-900"
-              : isDark ? "bg-slate-950 border-[#2E2E33]" : "bg-slate-100 border-slate-200"
-          }`}>
-            <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
-            />
-          </div>
-        )}
-
         {/* Right Nav Icons */}
         <div className="flex items-center gap-5">
-          {currentUser && (
-            <>
-              {/* Search Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-                </svg>
-              </button>
-              
-              {/* Direct Messages Icon */}
-              <button 
-                onClick={() => setCurrentView("chat")}
-                className="text-slate-500 hover:text-slate-800 transition-colors relative"
-              >
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white animate-pulse">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-            </>
-          )}
-
-
           {/* Theme Toggle Button */}
           <button
             onClick={() => {
@@ -3406,44 +3260,22 @@ export default function Home() {
           </button>
 
           {currentUser && (
-            <>
-              {/* Phone Call Icon */}
-              <button className={`p-2 rounded-lg transition-colors ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                </svg>
-              </button>
-
-              {/* Notification Bell */}
-              <button className={`p-2 rounded-lg transition-colors relative ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                </svg>
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#E8EA7A] text-[#252529] text-[9px] font-black flex items-center justify-center">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Logged in user avatar */}
-              <div className="relative group cursor-pointer" onClick={() => {
-                if (currentUser) {
-                  setName(currentUser.username);
-                  setUsername(currentUser.username);
-                  setBio(currentUser.bio || "");
-                  setAvatar(currentUser.avatarUrl);
-                }
-                setNavView("settings");
-                setCurrentView("settings");
-              }}>
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.username}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-[#E8EA7A]/30 hover:border-[#E8EA7A] transition-all"
-                />
-              </div>
-            </>
+            <div className="relative group cursor-pointer" onClick={() => {
+              if (currentUser) {
+                setName(currentUser.username);
+                setUsername(currentUser.username);
+                setBio(currentUser.bio || "");
+                setAvatar(currentUser.avatarUrl);
+              }
+              setNavView("settings");
+              setCurrentView("settings");
+            }}>
+              <img
+                src={currentUser.avatarUrl}
+                alt={currentUser.username}
+                className="w-8 h-8 rounded-full object-cover border-2 border-[#E8EA7A]/30 hover:border-[#E8EA7A] transition-all"
+              />
+            </div>
           )}
         </div>
       </header>
@@ -3686,16 +3518,23 @@ export default function Home() {
             <div className="flex-1 py-4 px-3 space-y-1">
               <button
                 onClick={() => { setNavView("chat"); setCurrentView("chat"); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
                   navView === "chat"
                     ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
                     : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
                 }`}
               >
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-                </svg>
-                Chat
+                <div className="flex items-center gap-3">
+                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+                  </svg>
+                  <span>Chat</span>
+                </div>
+                {totalUnreadCount > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white animate-pulse">
+                    {totalUnreadCount}
+                  </span>
+                )}
               </button>
 
               <button
@@ -3710,6 +3549,20 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
                 </svg>
                 Group
+              </button>
+
+              <button
+                onClick={() => { setNavView("calls"); setCurrentView("chat"); }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
+                  navView === "calls"
+                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8EA7A] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
+                }`}
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                </svg>
+                Calls
               </button>
 
               <button
@@ -3783,104 +3636,160 @@ export default function Home() {
                   className={`bg-transparent text-sm w-full outline-none font-normal ${isDark ? "text-[#E8E8F0] placeholder-[#6B6B8A]" : "text-[#252529] placeholder-[#9090B0]"}`}
                 />
               </div>
-              
-              <div className="flex justify-between items-center text-xs text-slate-450 font-bold tracking-wide">
-                <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-650">
-                  <span>Latest First</span>
-                  <svg className="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </div>
-              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-              {filteredContacts.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
+              {navView === "calls" ? (
+                filteredContacts.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
+                ) : (
+                  filteredContacts.map((user) => {
+                    const isOnline = onlineUsers[user.username] === "online";
+                    const isAway = onlineUsers[user.username] === "away";
+                    return (
+                      <div
+                        key={user.username}
+                        className={`w-full p-3 flex items-center justify-between rounded-xl border border-transparent hover:bg-slate-105/5 transition-all`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="relative flex-shrink-0">
+                            <div className="w-[40px] h-[40px] rounded-full overflow-hidden">
+                              <img src={user.avatarUrl} className="w-full h-full object-cover" />
+                            </div>
+                            <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
+                              isDark ? "border-[#252529]" : "border-white"
+                            } ${
+                              isOnline ? "bg-emerald-500" : isAway ? "bg-amber-500" : "bg-slate-400"
+                            }`} />
+                          </div>
+                          <div className="text-left min-w-0">
+                            <span className={`text-[13px] font-bold block truncate ${
+                              isDark ? "text-[#E8E8F0]" : "text-[#252529]"
+                            }`}>
+                              {user.username}
+                            </span>
+                            <span className="text-[10.5px] text-slate-450 block truncate">
+                              {user.email}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              setActiveContact(user);
+                              startCall("audio");
+                            }}
+                            title="Audio Call"
+                            className="p-2 rounded-xl text-emerald-500 hover:bg-emerald-500/10 active:scale-90 transition-all cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveContact(user);
+                              startCall("video");
+                            }}
+                            title="Video Call"
+                            className="p-2 rounded-xl text-sky-500 hover:bg-sky-500/10 active:scale-90 transition-all cursor-pointer"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )
               ) : (
-                filteredContacts.map((user) => {
-                  const isOnline = onlineUsers[user.username] === "online";
-                  const isAway = onlineUsers[user.username] === "away";
-                  const isTyping = typingUsers[user.username];
-                  const isActive = activeContact?.username === user.username;
-                  const lastMsg = getLastMessage(user.username);
-                  const rel = getChatRelationship(user.username);
-                  
+                filteredContacts.length === 0 ? (
+                  <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
+                ) : (
+                  filteredContacts.map((user) => {
+                    const isOnline = onlineUsers[user.username] === "online";
+                    const isAway = onlineUsers[user.username] === "away";
+                    const isTyping = typingUsers[user.username];
+                    const isActive = activeContact?.username === user.username;
+                    const lastMsg = getLastMessage(user.username);
+                    const rel = getChatRelationship(user.username);
+                    
 
-                  return (
-                    <button
-                      key={user.username}
-                      onClick={() => {
-                        setActiveContact(user);
-                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                          setIsDetailPaneOpen(false);
-                        }
-                      }}
-                      className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 ${
-                        isActive
-                          ? isDark ? "bg-[#2E2E33] border border-[#2E2E33]" 
-                            : "bg-[#E8E8F0] border border-[#D0D0DA]"
-                          : isDark ? "border border-transparent hover:bg-[#2E2E33]/60" 
-                            : "border border-transparent hover:bg-[#F0F0F8]"
-                      }`}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <div className="w-[46px] h-[46px] rounded-full overflow-hidden">
-                          <img 
-                            src={user.avatarUrl} 
-                            className="w-full h-full rounded-full object-cover" 
-                          />
+                    return (
+                      <button
+                        key={user.username}
+                        onClick={() => {
+                          setActiveContact(user);
+                          if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                            setIsDetailPaneOpen(false);
+                          }
+                        }}
+                        className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 ${
+                          isActive
+                            ? isDark ? "bg-[#2E2E33] border border-[#2E2E33]" 
+                              : "bg-[#E8E8F0] border border-[#D0D0DA]"
+                            : isDark ? "border border-transparent hover:bg-[#2E2E33]/60" 
+                              : "border border-transparent hover:bg-[#F0F0F8]"
+                        }`}
+                      >
+                        <div className="relative flex-shrink-0">
+                          <div className="w-[46px] h-[46px] rounded-full overflow-hidden">
+                            <img 
+                              src={user.avatarUrl} 
+                              className="w-full h-full rounded-full object-cover" 
+                            />
+                          </div>
+                          
+                          <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
+                            isDark ? "border-[#252529]" : "border-white"
+                          } ${
+                            isTyping ? "bg-amber-400 animate-pulse" :
+                            isOnline ? "bg-emerald-500 pulse-online" :
+                            isAway ? "bg-amber-500" : "bg-slate-400"
+                          }`} />
                         </div>
                         
-                        <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
-                          isDark ? "border-[#252529]" : "border-white"
-                        } ${
-                          isTyping ? "bg-amber-400 animate-pulse" :
-                          isOnline ? "bg-emerald-500 pulse-online" :
-                          isAway ? "bg-amber-500" : "bg-slate-400"
-                        }`} />
-                      </div>
-                      
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex justify-between items-center mb-0.5">
-                          <span className={`text-[13px] font-bold truncate ${
-                            isDark ? "text-[#E8E8F0]" : "text-[#252529]"
-                          }`}>
-                            {user.username}
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="flex justify-between items-center mb-0.5">
+                            <span className={`text-[13px] font-bold truncate ${
+                              isDark ? "text-[#E8E8F0]" : "text-[#252529]"
+                            }`}>
+                              {user.username}
+                            </span>
+                            {lastMsg ? (
+                              <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>{lastMsg.time}</span>
+                            ) : (
+                              <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>08:04 AM</span>
+                            )}
+                          </div>
+                          
+                          <div className={`text-[11.5px] truncate leading-snug ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
+                            {isTyping ? (
+                              <span className="text-[#E8EA7A] font-bold animate-pulse">typing...</span>
+                            ) : rel && rel.status === 'pending' ? (
+                              rel.sender.toLowerCase() === currentUser.username.toLowerCase()
+                                ? <span className="text-amber-500 font-bold">Request Pending ✉️</span>
+                                : <span className="text-sky-500 font-bold animate-pulse">Wants to Chat! ✉️</span>
+                            ) : rel && rel.status === 'declined' ? (
+                              <span className="text-rose-500 font-bold">Request Declined ❌</span>
+                            ) : lastMsg ? (
+                              <span>{lastMsg.text || "📷 Photo attachment"}</span>
+                            ) : (
+                              <span>{user.statusText || "Start DM"}</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
+                          <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8EA7A] text-[9px] font-black text-[#252529] flex items-center justify-center select-none shadow animate-pulse">
+                            REQ
                           </span>
-                          {lastMsg ? (
-                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>{lastMsg.time}</span>
-                          ) : (
-                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>08:04 AM</span>
-                          )}
-                        </div>
-                        
-                        <div className={`text-[11.5px] truncate leading-snug ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
-                          {isTyping ? (
-                            <span className="text-[#E8EA7A] font-bold animate-pulse">typing...</span>
-                          ) : rel && rel.status === 'pending' ? (
-                            rel.sender.toLowerCase() === currentUser.username.toLowerCase()
-                              ? <span className="text-amber-500 font-bold">Request Pending ✉️</span>
-                              : <span className="text-sky-500 font-bold animate-pulse">Wants to Chat! ✉️</span>
-                          ) : rel && rel.status === 'declined' ? (
-                            <span className="text-rose-500 font-bold">Request Declined ❌</span>
-                          ) : lastMsg ? (
-                            <span>{lastMsg.text || "📷 Photo attachment"}</span>
-                          ) : (
-                            <span>{user.statusText || "Start DM"}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
-                        <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8EA7A] text-[9px] font-black text-[#252529] flex items-center justify-center select-none shadow animate-pulse">
-                          REQ
-                        </span>
-
-                      ) : null}
-                    </button>
-                  );
-                })
+                        ) : null}
+                      </button>
+                    );
+                  })
+                )
               )}
             </div>
 
