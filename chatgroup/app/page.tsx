@@ -3091,7 +3091,7 @@ export default function Home() {
                 <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
                   theme === "black"
                     ? "bg-black border-neutral-900"
-                    : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
+                    : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
                 }`}>
                   <div className="flex items-center gap-3">
                     <button 

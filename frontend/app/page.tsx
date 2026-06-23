@@ -2392,21 +2392,21 @@ export default function Home() {
     <div className={`w-full h-screen max-h-screen flex flex-col font-sans antialiased overflow-hidden ${
       theme === "black" 
         ? "bg-black text-slate-100 black-theme" 
-        : isDark ? "bg-[#1A1A2E] text-[#E8E8F0]" 
-          : "bg-[#F5F5FA] text-[#1A1A2E]"
+        : isDark ? "bg-[#252529] text-[#E8E8F0]" 
+          : "bg-[#F5F5FA] text-[#252529]"
     }`}>
       
       {/* 1. TOP NAVBAR - Chatme Style */}
       <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
         theme === "black"
           ? "bg-black border-neutral-900"
-          : isDark ? "bg-[#16162A] border-[#333355]" : "bg-white border-[#E0E0EA]"
+          : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
       }`}>
         
         {/* Left: Logo */}
         <div className="flex items-center gap-2.5 select-none">
-          <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8D44D]" : "text-[#1A1A2E]"}`}>
-            Friend
+          <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8EA7A]" : "text-[#252529]"}`}>
+            Chatme
           </span>
         </div>
 
@@ -2470,7 +2470,7 @@ export default function Home() {
               });
             }}
             className={`w-[44px] h-[24px] rounded-full relative cursor-pointer transition-all duration-300 ${
-              isDark ? "bg-[#E8D44D]" : "bg-[#D0D0DA]"
+              isDark ? "bg-[#E8EA7A]" : "bg-[#D0D0DA]"
             }`}
             title={`Toggle Theme`}
           >
@@ -2482,19 +2482,19 @@ export default function Home() {
           {currentUser && (
             <>
               {/* Phone Call Icon */}
-              <button className={`p-2 rounded-lg transition-colors ${isDark ? "text-[#9090B0] hover:text-[#E8D44D]" : "text-[#6B6B8A] hover:text-[#1A1A2E]"}`}>
+              <button className={`p-2 rounded-lg transition-colors ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
                 </svg>
               </button>
 
               {/* Notification Bell */}
-              <button className={`p-2 rounded-lg transition-colors relative ${isDark ? "text-[#9090B0] hover:text-[#E8D44D]" : "text-[#6B6B8A] hover:text-[#1A1A2E]"}`}>
+              <button className={`p-2 rounded-lg transition-colors relative ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
                 </svg>
                 {totalUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#E8D44D] text-[#1A1A2E] text-[9px] font-black flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#E8EA7A] text-[#252529] text-[9px] font-black flex items-center justify-center">
                     {totalUnreadCount}
                   </span>
                 )}
@@ -2514,7 +2514,7 @@ export default function Home() {
                 <img
                   src={currentUser.avatarUrl}
                   alt={currentUser.username}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-[#E8D44D]/30 hover:border-[#E8D44D] transition-all"
+                  className="w-8 h-8 rounded-full object-cover border-2 border-[#E8EA7A]/30 hover:border-[#E8EA7A] transition-all"
                 />
               </div>
             </>
@@ -2737,18 +2737,18 @@ export default function Home() {
           <nav className={`hidden md:flex w-[200px] flex-shrink-0 flex-col border-r transition-all duration-300 ${
             theme === "black"
               ? "bg-black border-neutral-900"
-              : isDark ? "bg-[#16162A] border-[#333355]" : "bg-[#EEEEF5] border-[#E0E0EA]"
+              : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-[#EEEEF5] border-[#E0E0EA]"
           }`}>
             {/* User Profile Section */}
-            <div className={`p-5 border-b ${isDark ? "border-[#333355]" : "border-[#E0E0EA]"}`}>
+            <div className={`p-5 border-b ${isDark ? "border-[#2E2E33]" : "border-[#E0E0EA]"}`}>
               <div className="flex items-center gap-3">
                 <img
                   src={currentUser.avatarUrl}
                   alt={currentUser.username}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-[#E8D44D]/30"
+                  className="w-10 h-10 rounded-full object-cover border-2 border-[#E8EA7A]/30"
                 />
                 <div className="min-w-0">
-                  <h3 className={`text-sm font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"}`}>
+                  <h3 className={`text-sm font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>
                     {currentUser.username}
                   </h3>
                   <p className="text-[10px] text-emerald-400 font-semibold">Available</p>
@@ -2762,8 +2762,8 @@ export default function Home() {
                 onClick={() => { setNavView("chat"); setCurrentView("chat"); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
                   navView === "chat"
-                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
                 }`}
               >
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -2776,8 +2776,8 @@ export default function Home() {
                 onClick={() => { setNavView("group"); }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
                   navView === "group"
-                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
                 }`}
               >
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -2799,8 +2799,8 @@ export default function Home() {
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
                   navView === "settings"
-                    ? isDark ? "bg-[#E8D44D]/12 text-[#E8D44D] border border-[#E8D44D]/15" : "bg-[#E8D44D]/10 text-[#9A8A20] border border-[#E8D44D]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#252540] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#1A1A2E] border border-transparent"
+                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
+                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
                 }`}
               >
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -2812,7 +2812,7 @@ export default function Home() {
             </div>
 
             {/* Logout at bottom */}
-            <div className={`p-3 border-t ${isDark ? "border-[#333355]" : "border-[#E0E0EA]"}`}>
+            <div className={`p-3 border-t ${isDark ? "border-[#2E2E33]" : "border-[#E0E0EA]"}`}>
               <button
                 onClick={handleLogout}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
@@ -2832,7 +2832,7 @@ export default function Home() {
             className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 relative ${
               theme === "black"
                 ? "bg-black border-neutral-900"
-                : isDark ? "bg-[#1E1E35] border-[#333355]" : "bg-white border-[#E0E0EA]"
+                : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
             } ${
               activeContact 
                 ? "hidden md:flex w-[320px] h-full" 
@@ -2844,7 +2844,7 @@ export default function Home() {
               <div className={`w-full h-[38px] border rounded-xl flex items-center px-3 gap-2 ${
                 theme === "black"
                   ? "bg-[#0a0a0a] border-neutral-900"
-                  : isDark ? "bg-[#252540] border-[#333355]" : "bg-[#F0F0F8] border-[#E0E0EA]"
+                  : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-[#F0F0F8] border-[#E0E0EA]"
               }`}>
                 <svg className="w-4 h-4 text-[#6B6B8A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
@@ -2854,7 +2854,7 @@ export default function Home() {
                   placeholder="Search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`bg-transparent text-sm w-full outline-none font-normal ${isDark ? "text-[#E8E8F0] placeholder-[#6B6B8A]" : "text-[#1A1A2E] placeholder-[#9090B0]"}`}
+                  className={`bg-transparent text-sm w-full outline-none font-normal ${isDark ? "text-[#E8E8F0] placeholder-[#6B6B8A]" : "text-[#252529] placeholder-[#9090B0]"}`}
                 />
               </div>
               
@@ -2892,9 +2892,9 @@ export default function Home() {
                       }}
                       className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 ${
                         isActive
-                          ? isDark ? "bg-[#252540] border border-[#333355]" 
+                          ? isDark ? "bg-[#2E2E33] border border-[#2E2E33]" 
                             : "bg-[#E8E8F0] border border-[#D0D0DA]"
-                          : isDark ? "border border-transparent hover:bg-[#252540]/60" 
+                          : isDark ? "border border-transparent hover:bg-[#2E2E33]/60" 
                             : "border border-transparent hover:bg-[#F0F0F8]"
                       }`}
                     >
@@ -2907,7 +2907,7 @@ export default function Home() {
                         </div>
                         
                         <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
-                          isDark ? "border-[#1E1E35]" : "border-white"
+                          isDark ? "border-[#252529]" : "border-white"
                         } ${
                           isTyping ? "bg-amber-400 animate-pulse" :
                           isOnline ? "bg-emerald-500 pulse-online" :
@@ -2918,7 +2918,7 @@ export default function Home() {
                       <div className="flex-1 text-left min-w-0">
                         <div className="flex justify-between items-center mb-0.5">
                           <span className={`text-[13px] font-bold truncate ${
-                            isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"
+                            isDark ? "text-[#E8E8F0]" : "text-[#252529]"
                           }`}>
                             {user.username}
                           </span>
@@ -2947,7 +2947,7 @@ export default function Home() {
                       </div>
 
                       {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
-                        <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8D44D] text-[9px] font-black text-[#1A1A2E] flex items-center justify-center select-none shadow animate-pulse">
+                        <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8EA7A] text-[9px] font-black text-[#252529] flex items-center justify-center select-none shadow animate-pulse">
                           REQ
                         </span>
 
@@ -2974,7 +2974,7 @@ export default function Home() {
             className={`flex-1 flex flex-col border-r transition-all duration-300 ${
               theme === "black"
                 ? "bg-black border-neutral-900"
-                : isDark ? "bg-[#1A1A2E] border-[#333355]" : "bg-white border-[#E0E0EA]"
+                : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
             } ${
               !activeContact 
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
@@ -2987,7 +2987,7 @@ export default function Home() {
                 <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
                   theme === "black"
                     ? "bg-black border-neutral-900"
-                    : isDark ? "bg-[#16162A] border-[#333355]" : "bg-white border-[#E0E0EA]"
+                    : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
                 }`}>
                   <div className="flex items-center gap-3">
                     <button 
@@ -3012,7 +3012,7 @@ export default function Home() {
                       }`} />
                     </div>
                     <div>
-                      <h3 className={`text-sm font-bold ${isDark ? "text-[#E8E8F0]" : "text-[#1A1A2E]"}`}>{activeContact.username}</h3>
+                      <h3 className={`text-sm font-bold ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>{activeContact.username}</h3>
                       <p className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
                         {typingUsers[activeContact.username] ? "typing..." : "Last seen 04.10 pm"}
                       </p>
@@ -3049,7 +3049,7 @@ export default function Home() {
                 </header>
 
                 <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar flex flex-col ${
-                  theme === "black" ? "bg-black" : isDark ? "bg-[#1A1A2E]" : "bg-[#F5F5FA]"
+                  theme === "black" ? "bg-black" : isDark ? "bg-[#252529]" : "bg-[#F5F5FA]"
                 }`}>
 
                   {conversationMessages.map((msg) => {
@@ -3074,9 +3074,9 @@ export default function Home() {
                           <div
                             className={`px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words relative ${
                               isMe
-                                ? "bg-[#E8D44D] text-[#1A1A2E] rounded-br-sm"
-                                : isDark ? "bg-[#2D2D4A] text-[#E8E8F0] rounded-bl-sm border border-[#333355]"
-                                  : "bg-[#F0F0F8] text-[#1A1A2E] rounded-bl-sm border border-[#E0E0EA]"
+                                ? "bg-[#3D1B5C] text-[#FFFFFF] rounded-br-sm shadow-sm"
+                                : isDark ? "bg-[#2E2E33] text-[#E8E8F0] rounded-bl-sm border border-[#2E2E33]"
+                                  : "bg-[#F0F0F8] text-[#252529] rounded-bl-sm border border-[#E0E0EA]"
                             }`}
                           >
                             {msg.text && <p className="font-normal">{msg.text}</p>}
@@ -3090,7 +3090,7 @@ export default function Home() {
                             )}
 
                             <div className="flex items-center justify-end mt-1 text-[9px] font-medium select-none">
-                              <span className={isMe ? "text-[#1A1A2E]/70" : isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}>{msg.time}</span>
+                              <span className={isMe ? "text-[#FFFFFF]/70" : isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}>{msg.time}</span>
                               {isMe && msg.status && renderCheckmarks(msg.status)}
                             </div>
                           </div>
@@ -3236,10 +3236,10 @@ export default function Home() {
                         />
                         <button
                           onClick={() => handleSendMessage()}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 hover:brightness-110 text-white flex items-center justify-center active:scale-90 transition-transform shadow shadow-sky-500/10 cursor-pointer"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-xl bg-[#E8EA7A] text-[#1E1E22] hover:bg-[#F3F59B] flex items-center justify-center active:scale-95 hover:scale-105 transition-all shadow-md shadow-[#E8EA7A]/20 rounded-full cursor-pointer"
                           disabled={!inputText.trim()}
                         >
-                          <svg className="w-[15px] h-[15px] rotate-45 -translate-x-[0.5px] stroke-[2.8]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-[15px] h-[15px] rotate-45 -translate-x-[0.5px] stroke-[2.8] text-[#1E1E22]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                           </svg>
                         </button>
@@ -3346,7 +3346,7 @@ export default function Home() {
           {activeContact && isDetailPaneOpen && (
             <aside 
               className={`w-full lg:w-[320px] border-l flex flex-col items-center text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none overflow-y-auto ${
-                isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
+                theme === "black" ? "bg-black border-neutral-900" : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200"
               }`}
             >
               {/* Cover Banner Cover */}
@@ -3383,7 +3383,7 @@ export default function Home() {
                 </span>
 
                 <div className={`w-full rounded-2xl p-4 border text-left mb-6 ${
-                  isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-150"
+                  theme === "black" ? "bg-[#070709] border-neutral-900" : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-slate-50 border-slate-150"
                 }`}>
                   <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Biography</h4>
                   <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-655"}`}>
