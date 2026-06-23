@@ -297,6 +297,30 @@ export default function Home() {
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat"
         };
+      case "tangled":
+        return {
+          backgroundColor: "#404528",
+          backgroundImage: "url('/tangled.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "bows-pattern":
+        return {
+          backgroundColor: "#FFEFDF",
+          backgroundImage: "url('/bows_pattern.png')",
+          backgroundSize: "180px auto",
+          backgroundPosition: "center",
+          backgroundRepeat: "repeat"
+        };
+      case "spiderman":
+        return {
+          backgroundColor: "#BF373B",
+          backgroundImage: "url('/spiderman.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
       case "nude-cream":
         return { backgroundColor: "#FAF8F5" };
       case "nude-sand":
@@ -3057,6 +3081,90 @@ export default function Home() {
                         </div>
                         <span className="text-xs.5 font-bold">Rainy Weather</span>
                         <span className="text-[9px] text-slate-500 mt-0.5">Cozy evening streets with warm glowing lights and soft rain</span>
+                      </button>
+
+                      {/* Tangled Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("tangled");
+                          localStorage.setItem("chatgroup_background", "tangled");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "tangled"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/tangled.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Tangled</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Tangled</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Rapunzel and Flynn Rider in a flower forest</span>
+                      </button>
+
+                      {/* Cute Bows Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("bows-pattern");
+                          localStorage.setItem("chatgroup_background", "bows-pattern");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "bows-pattern"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/bows_pattern.png')",
+                            backgroundSize: "contain",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-800 bg-white/70 px-2 py-1 rounded">Cute Bows</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Cute Bows</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Repeating bows, cherries, and hearts cream pattern</span>
+                      </button>
+
+                      {/* Spider-Man Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("spiderman");
+                          localStorage.setItem("chatgroup_background", "spiderman");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "spiderman"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/spiderman.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Spider-Man</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Spider-Man</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Spider-Man and Gwen Stacy red cityscape theme</span>
                       </button>
                     </div>
                   </div>
