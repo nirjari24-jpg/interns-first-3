@@ -283,6 +283,20 @@ export default function Home() {
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat"
         };
+      case "nature-lake":
+        return {
+          backgroundImage: "url('/nature_lake.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "rainy-weather":
+        return {
+          backgroundImage: "url('/rainy_weather.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
       case "nude-cream":
         return { backgroundColor: "#FAF8F5" };
       case "nude-sand":
@@ -2987,6 +3001,62 @@ export default function Home() {
                         </div>
                         <span className="text-xs.5 font-bold">Retro Blobs</span>
                         <span className="text-[9px] text-slate-500 mt-0.5">Terracotta, beige, and blue organic shape layers</span>
+                      </button>
+
+                      {/* Nature Lake Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("nature-lake");
+                          localStorage.setItem("chatgroup_background", "nature-lake");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "nature-lake"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/nature_lake.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Nature Lake</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Nature Lake</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">A calm autumn lake surrounded by warm orange foliage</span>
+                      </button>
+
+                      {/* Rainy Weather Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("rainy-weather");
+                          localStorage.setItem("chatgroup_background", "rainy-weather");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "rainy-weather"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/rainy_weather.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Rainy Weather</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Rainy Weather</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Cozy evening streets with warm glowing lights and soft rain</span>
                       </button>
                     </div>
                   </div>
