@@ -1093,11 +1093,11 @@ export default function Home() {
                   const storedToken = localStorage.getItem("chatgroup_session_token");
                   const reRegBody = {
                     username: parsed.username,
-                    email: parsed.email || `${parsed.username.toLowerCase().replace(/\s+/g, "")}@chatgroup.com`,
+                    email: parsed.email || `${parsed.username.toLowerCase().replace(/\s+/g, "")}@chitchat.com`,
                     password: storedToken || ("chatgroup_auto_restore_" + parsed.username),
                     avatarUrl: parsed.avatarUrl,
                     category: parsed.category || "MEMBER",
-                    bio: parsed.bio || "Joined ChatGroup."
+                    bio: parsed.bio || "Joined Chitchat."
                   };
                   fetch(`${API_BASE}/api/users/register`, {
                     method: "POST",
@@ -1636,7 +1636,7 @@ export default function Home() {
       password: regPassword.trim(),  // trim to avoid accidental spaces
       avatarUrl: selectedAvatarUrl,
       category: "MEMBER",
-      bio: "Joined ChatGroup. Let's communicate in real-time."
+      bio: "Joined Chitchat. Let's communicate in real-time."
     };
 
     setIsAuthLoading(true);
@@ -3223,7 +3223,7 @@ export default function Home() {
           : "bg-[#F5F5FA] text-[#252529]"
     }`}>
       
-      {/* 1. TOP NAVBAR - Chatme Style */}
+      {/* 1. TOP NAVBAR - Chitchat Style */}
       <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
         theme === "black"
           ? "bg-black border-neutral-900"
@@ -3231,9 +3231,10 @@ export default function Home() {
       }`}>
         
         {/* Left: Logo */}
-        <div className="flex items-center gap-2.5 select-none">
+        <div className="flex items-center gap-2 select-none">
+          <img src="/logo.png" alt="Logo" className="w-6.5 h-6.5 object-contain" />
           <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8EA7A]" : "text-[#252529]"}`}>
-            Chatme
+            Chitchat
           </span>
         </div>
 
@@ -3335,7 +3336,7 @@ export default function Home() {
                     type="text"
                     value={authEmail}
                     onChange={(e) => setAuthEmail(e.target.value)}
-                    placeholder="e.g. paul or paul@chatgroup.com"
+                    placeholder="e.g. paul or paul@chitchat.com"
                     className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
                       isDark ? "bg-slate-900/50 border-[#2E2E33] text-white placeholder-slate-500 focus:border-[#E8EA7A] focus:ring-[#E8EA7A]/10" 
                         : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-[#E8EA7A] focus:ring-[#E8EA7A]/10 shadow-sm"
