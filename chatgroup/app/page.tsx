@@ -2400,7 +2400,7 @@ export default function Home() {
       <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
         theme === "black"
           ? "bg-black border-neutral-900"
-          : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
+          : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
       }`}>
         
         {/* Left: Logo */}
@@ -3345,7 +3345,7 @@ export default function Home() {
           {activeContact && isDetailPaneOpen && (
             <aside 
               className={`w-full lg:w-[320px] border-l flex flex-col items-center text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none overflow-y-auto ${
-                isDark ? "bg-black border-slate-900" : "bg-white border-slate-200"
+                theme === "black" ? "bg-black border-neutral-900" : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200"
               }`}
             >
               {/* Cover Banner Cover */}
@@ -3382,7 +3382,7 @@ export default function Home() {
                 </span>
 
                 <div className={`w-full rounded-2xl p-4 border text-left mb-6 ${
-                  isDark ? "bg-[#070709] border-slate-900" : "bg-slate-50 border-slate-150"
+                  theme === "black" ? "bg-[#070709] border-neutral-900" : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-slate-50 border-slate-150"
                 }`}>
                   <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Biography</h4>
                   <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-655"}`}>
