@@ -232,6 +232,27 @@ export default function Home() {
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat"
         };
+      case "aurora-glow":
+        return {
+          backgroundImage: "url('/aurora_glow.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "cyberpunk-neon":
+        return {
+          backgroundImage: "url('/cyberpunk_neon.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "forest-mist":
+        return {
+          backgroundImage: "url('/forest_mist.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
       case "nude-cream":
         return { backgroundColor: "#FAF8F5" };
       case "nude-sand":
@@ -2738,6 +2759,90 @@ export default function Home() {
                         </div>
                         <span className="text-xs.5 font-bold">Sunset Glow</span>
                         <span className="text-[9px] text-slate-500 mt-0.5">A warm, sunset-inspired gradient with a relaxing blend of hues</span>
+                      </button>
+
+                      {/* Aurora Glow Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("aurora-glow");
+                          localStorage.setItem("chatgroup_background", "aurora-glow");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "aurora-glow"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/aurora_glow.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Aurora Glow</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Aurora Glow</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">A dynamic and gorgeous neon aurora theme</span>
+                      </button>
+
+                      {/* Cyberpunk Neon Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("cyberpunk-neon");
+                          localStorage.setItem("chatgroup_background", "cyberpunk-neon");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "cyberpunk-neon"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/cyberpunk_neon.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-200 bg-black/60 px-2 py-1 rounded">Cyberpunk Neon</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Cyberpunk Neon</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Vibrant synthwave grids and neon city flows</span>
+                      </button>
+
+                      {/* Forest Mist Theme */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setChatBackground("forest-mist");
+                          localStorage.setItem("chatgroup_background", "forest-mist");
+                        }}
+                        className={`flex flex-col text-left rounded-2xl border p-4 transition-all duration-350 cursor-pointer group ${
+                          chatBackground === "forest-mist"
+                            ? "border-cyan-500/80 bg-cyan-500/5 shadow-[0_8px_20px_rgba(6,182,212,0.15)]"
+                            : isDark ? "border-slate-800 bg-slate-950/20 hover:border-slate-700" : "border-slate-200 bg-slate-50 hover:border-slate-350"
+                        }`}
+                      >
+                        <div 
+                          className="w-full h-24 rounded-xl mb-3 flex items-center justify-center border border-slate-850/30"
+                          style={{
+                            backgroundImage: "url('/forest_mist.png')",
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat"
+                          }}
+                        >
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-800 bg-white/70 px-2 py-1 rounded">Forest Mist</span>
+                        </div>
+                        <span className="text-xs.5 font-bold">Forest Mist</span>
+                        <span className="text-[9px] text-slate-500 mt-0.5">Calming pine forest with peaceful morning fog</span>
                       </button>
                     </div>
                   </div>
