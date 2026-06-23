@@ -28,7 +28,8 @@ import {
   Laptop,
   Check,
   AlertTriangle,
-  Award
+  Award,
+  Palette
 } from "lucide-react";
 
 // Types
@@ -50,6 +51,12 @@ interface Message {
   time: string;
   status?: "sent" | "delivered" | "read";
   isNew?: boolean;
+  edited?: boolean;
+  forwarded?: boolean;
+  replyToId?: string;
+  replyToSender?: string;
+  replyToText?: string;
+  reactions?: { username: string; emoji: string }[];
 }
 
 interface MessageRequest {
@@ -145,7 +152,7 @@ export default function Home() {
   const [navView, setNavView] = useState<"chat" | "group" | "settings">("chat"); // left nav sidebar active view
 
   // Settings Theme
-  const [theme, setTheme] = useState<"light" | "dark" | "black">("dark"); // "dark", "light", or "black"
+  const theme = "dark"; const setTheme = () => {}; // "dark", "light", or "black"
   const isDark = theme === "dark" || theme === "black";
 
   const [name, setName] = useState("");
@@ -196,6 +203,106 @@ export default function Home() {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
   const [inputText, setInputText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Message interaction states
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [messageActionsOpenId, setMessageActionsOpenId] = useState<string | null>(null);
+  const [chatBackground, setChatBackground] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("chatgroup_background") || "default";
+    }
+    return "default";
+  });
+
+  const getChatBgStyles = () => {
+    switch (chatBackground) {
+      case "starry":
+        return {
+          backgroundImage: "url('/starry_sky.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "nude-minimalist":
+        return {
+          backgroundImage: "url('/nude_minimalist.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "aurora-glow":
+        return {
+          backgroundImage: "url('/aurora_glow.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "cyberpunk-neon":
+        return {
+          backgroundImage: "url('/cyberpunk_neon.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "forest-mist":
+        return {
+          backgroundImage: "url('/forest_mist.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "cute-shinchan":
+        return {
+          backgroundColor: "#FEDEC9",
+          backgroundImage: "url('/cute_shinchan.png')",
+          backgroundSize: "contain",
+          backgroundPosition: "right bottom",
+          backgroundRepeat: "no-repeat"
+        };
+      case "cute-chibi":
+        return {
+          backgroundColor: "#FFE9EF",
+          backgroundImage: "url('/cute_chibi.png')",
+          backgroundSize: "contain",
+          backgroundPosition: "right bottom",
+          backgroundRepeat: "no-repeat"
+        };
+      case "cute-retro":
+        return {
+          backgroundImage: "url('/cute_retro.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "retro-blobs":
+        return {
+          backgroundImage: "url('/retro_blobs.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat"
+        };
+      case "nude-cream":
+        return { backgroundColor: "#FAF8F5" };
+      case "nude-sand":
+        return { backgroundColor: "#EADBC8" };
+      case "nude-tan":
+        return { backgroundColor: "#DAC0A3" };
+      case "nude-rose":
+        return { backgroundColor: "#E8DCD5" };
+      case "solid-dark":
+        return { backgroundColor: "#121214" };
+      case "sunset":
+        return {
+          backgroundColor: "#18181b",
+          backgroundImage: "linear-gradient(135deg, rgba(217, 119, 6, 0.25) 0%, rgba(225, 29, 72, 0.25) 50%, rgba(147, 51, 234, 0.25) 100%)",
+          backgroundSize: "cover"
+        };
+      default:
+        return {};
+    }
+  };
   
   // Emoji Picker states
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
@@ -997,6 +1104,16 @@ export default function Home() {
       setTimeout(() => scrollToBottom("smooth"), 50);
     });
 
+    // Listen for message edit events from server
+    socket.on("messageEdited", (editedMsg: Message) => {
+      setMessages((prev) => prev.map((m) => m.id === editedMsg.id ? { ...m, text: editedMsg.text, edited: true } : m));
+    });
+
+    // Listen for message reaction updates from server
+    socket.on("messageReactionUpdated", (data: { id: string; reactions: { username: string; emoji: string }[] }) => {
+      setMessages((prev) => prev.map((m) => m.id === data.id ? { ...m, reactions: data.reactions } : m));
+    });
+
     // Listen for read receipts from other users
     socket.on("messagesRead", (data: { reader: string }) => {
       if (!data || !data.reader) return;
@@ -1463,6 +1580,32 @@ export default function Home() {
     if (!textContent && !imageLink) return;
     if (!currentUser || !activeContact) return;
 
+    // Handle Edit message
+    if (editingMessage) {
+      if (!textContent) return;
+      
+      // Update locally
+      setMessages((prev) => prev.map((m) => m.id === editingMessage.id ? { ...m, text: textContent, edited: true } : m));
+      setInputText("");
+      setEditingMessage(null);
+      
+      // Emit through Socket
+      if (socketRef.current && socketRef.current.connected) {
+        socketRef.current.emit("editMessage", {
+          id: editingMessage.id,
+          text: textContent
+        });
+      } else {
+        // Fallback to REST API
+        fetch(`${API_BASE}/api/messages/${editingMessage.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: textContent })
+        }).catch(err => console.error("Error editing message via REST fallback:", err));
+      }
+      return;
+    }
+
     const timeStringVal = new Date().toLocaleTimeString([], {
       hour: "2-digit",
       minute: "2-digit"
@@ -1481,8 +1624,16 @@ export default function Home() {
       status: "sent"
     };
 
+    // Add reply properties if replying
+    if (replyingToMessage) {
+      newMsg.replyToId = replyingToMessage.id;
+      newMsg.replyToSender = replyingToMessage.sender;
+      newMsg.replyToText = replyingToMessage.text || (replyingToMessage.imageUrl ? "📷 Image" : "");
+    }
+
     setMessages((prev) => [...prev, newMsg]);
     setInputText("");
+    setReplyingToMessage(null); // Reset reply state
     playSound("send");
     setTimeout(() => scrollToBottom("smooth"), 50);
 
@@ -1493,7 +1644,10 @@ export default function Home() {
         recipient: activeContact.username,
         text: textContent,
         imageUrl: imageLink,
-        time: timeStringVal
+        time: timeStringVal,
+        replyToId: newMsg.replyToId,
+        replyToSender: newMsg.replyToSender,
+        replyToText: newMsg.replyToText
       });
 
       socketRef.current.emit("typing", {
@@ -1516,6 +1670,69 @@ export default function Home() {
     }
 
     // Mock auto-reply triggered by MOCK_CONTACTS is disabled
+  };
+
+  const handleForwardMessage = (targetContactUsername: string) => {
+    if (!forwardingMessage || !currentUser) return;
+
+    const timeStringVal = new Date().toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const tempId = Math.random().toString(36).substring(2, 9);
+
+    const newMsg: Message = {
+      id: tempId,
+      sender: currentUser.username,
+      recipient: targetContactUsername,
+      text: forwardingMessage.text,
+      imageUrl: forwardingMessage.imageUrl,
+      time: timeStringVal,
+      status: "sent",
+      forwarded: true
+    };
+
+    // Add locally if the active chat is this contact
+    if (activeContact && activeContact.username.toLowerCase() === targetContactUsername.toLowerCase()) {
+      setMessages((prev) => [...prev, newMsg]);
+      setTimeout(() => scrollToBottom("smooth"), 50);
+    }
+
+    // Emit through Socket
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("sendMessage", {
+        sender: currentUser.username,
+        recipient: targetContactUsername,
+        text: forwardingMessage.text,
+        imageUrl: forwardingMessage.imageUrl,
+        time: timeStringVal,
+        forwarded: true
+      });
+    } else {
+      // Fallback REST
+      fetch(`${API_BASE}/api/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMsg)
+      })
+      .catch(err => console.error("Error saving forwarded message:", err));
+    }
+
+    setForwardingMessage(null);
+    setToast(`Message forwarded to ${targetContactUsername}! ↪️`);
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleMessageReaction = (messageId: string, emoji: string) => {
+    if (!currentUser) return;
+
+    if (socketRef.current && socketRef.current.connected) {
+      socketRef.current.emit("messageReaction", {
+        id: messageId,
+        username: currentUser.username,
+        emoji
+      });
+    }
   };
 
 
@@ -1714,7 +1931,7 @@ export default function Home() {
   const securityScore = getSecurityScore();
 
   const getPasswordStrength = () => {
-    if (!newPassword) return { score: 0, label: "None", color: "bg-slate-800", text: "text-slate-500" };
+    if (!newPassword) return { score: 0, label: "None", color: "bg-[#2E2E33]", text: "text-slate-500" };
     let score = 0;
     if (hasMinLength) score++;
     if (hasCapital) score++;
@@ -1723,7 +1940,7 @@ export default function Home() {
 
     switch (score) {
       case 1: return { score: 33, label: "Weak ⚠️", color: "bg-rose-500/80", text: "text-rose-400" };
-      case 2: return { score: 66, label: "Medium ⚡", color: "bg-amber-500/80", text: "text-amber-400" };
+      case 2: return { score: 66, label: "Medium ⚡", color: "bg-amber-500/80", text: "text-[#E8EA7A]" };
       case 3: return { score: 100, label: "Strong ✨", color: "bg-emerald-500/80", text: "text-emerald-400" };
       default: return { score: 10, label: "Too Short ❌", color: "bg-rose-600/85", text: "text-rose-500" };
     }
@@ -1814,7 +2031,7 @@ export default function Home() {
       <main className={`min-h-screen w-full transition-colors duration-500 flex flex-col justify-start items-center p-4 sm:p-6 md:p-12 font-sans relative overflow-y-auto ${
         theme === "black" 
           ? "bg-black text-[#E4E6EB] black-theme" 
-          : isDark ? "bg-[#04060A] text-[#E4E6EB]" 
+          : isDark ? "bg-[#252529] text-[#FFFFFF]" 
             : "bg-slate-50 text-black light-theme"
       }`}>
         
@@ -1830,16 +2047,16 @@ export default function Home() {
         {/* Background glowing particles (Aurora effect) */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className={`absolute top-[5%] left-[10%] w-[380px] h-[380px] rounded-full blur-[120px] transition-opacity duration-700 ${
-            isDark ? "bg-cyan-500/10 opacity-100" : "bg-cyan-400/5 opacity-80"
+            isDark ? "bg-[#E8EA7A]/10 opacity-100" : "bg-[#E8EA7A]/5 opacity-80"
           }`} />
           <div className={`absolute bottom-[10%] right-[10%] w-[450px] h-[450px] rounded-full blur-[140px] transition-opacity duration-700 ${
-            isDark ? "bg-purple-500/10 opacity-100" : "bg-purple-400/5 opacity-80"
+            isDark ? "bg-[#3D1B5C]/10 opacity-100" : "bg-[#3D1B5C]/5 opacity-80"
           }`} />
         </div>
 
         {/* Floating Toast Notification */}
         {toast && (
-          <div className="fixed top-8 z-50 bg-gradient-to-r from-cyan-400 to-indigo-500 text-slate-950 font-extrabold px-6 py-4 rounded-full shadow-[0_12px_40px_rgba(6,182,212,0.4)] text-sm tracking-wide flex items-center gap-2.5 animate-bounce border border-white/20">
+          <div className="fixed top-8 z-50 bg-[#E8EA7A] text-[#1E1E22] font-extrabold px-6 py-4 rounded-full shadow-md shadow-[#E8EA7A]/10 text-sm tracking-wide flex items-center gap-2.5 animate-bounce border border-white/20">
             <CheckCheck className="w-5 h-5 text-slate-950" />
             <span>{toast}</span>
           </div>
@@ -1849,72 +2066,21 @@ export default function Home() {
           
           {/* Top Header Panel */}
           <div className={`relative border rounded-3xl p-5 md:p-6 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-6 overflow-hidden transition-colors duration-500 ${
-            isDark ? "bg-gradient-to-r from-black via-[#08080C] to-black border-slate-900" 
+            isDark ? "bg-[#1F1F23] border-[#2E2E33]" 
               : "bg-white border-slate-200"
           }`}>
             
-            <div className="absolute top-0 left-0 w-full h-[1.5px] bg-gradient-to-r from-transparent via-cyan-500 to-transparent" />
-            <div className="absolute bottom-0 left-0 w-full h-[1.5px] bg-gradient-to-r from-transparent via-purple-500 to-transparent" />
+            <div className="absolute top-0 left-0 w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#E8EA7A] to-transparent" />
+            <div className="absolute bottom-0 left-0 w-full h-[1.5px] bg-gradient-to-r from-transparent via-[#3D1B5C] to-transparent" />
 
             <div className="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
               {/* Back to Chat Trigger */}
-              <button
-                onClick={() => setCurrentView("chat")}
-                className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  isDark ? "bg-slate-900 border-slate-800 text-cyan-400 hover:bg-slate-800"
-                    : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
-                }`}
-                title="Back to ChatRoom"
-              >
-                <ArrowRight className="w-4.5 h-4.5 rotate-180" />
-              </button>
               
-              <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center flex-shrink-0 text-cyan-400 shadow-inner">
-                <Fingerprint className="w-6 h-6 animate-pulse" />
-              </div>
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-                  <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400 dark:from-white dark:to-slate-400 from-slate-950 to-slate-700">
-                    Settings Dashboard
-                  </span>
-                </h1>
-                <p className={`text-xs mt-1 ${isDark ? "text-slate-400" : "text-black font-semibold"}`}>
-                  Customize account profile details and manage credentials.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => {
-                  setTheme(prev => {
-                    const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
-                    setToast(next === "light" ? "Light Theme Activated ☀️" : next === "dark" ? "Dark Theme Activated 🌙" : "OLED Black Theme Activated 🌑");
-                    setTimeout(() => setToast(null), 2500);
-                    return next;
-                  });
-                }}
-                className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  theme === "black"
-                    ? "bg-[#121212] border-neutral-900 text-amber-400 hover:bg-neutral-900"
-                    : isDark ? "bg-slate-900 border-slate-800 text-amber-400 hover:bg-slate-850"
-                      : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
-                }`}
-                title={`Toggle Theme (Current: ${theme === "black" ? "OLED Black" : isDark ? "Dark Mode" : "Light Mode"})`}
-              >
-                {theme === "black" ? (
-                  <Sun className="w-4.5 h-4.5" />
-                ) : isDark ? (
-                  <Sparkles className="w-4.5 h-4.5" />
-                ) : (
-                  <Moon className="w-4.5 h-4.5" />
-                )}
-              </button>
 
               <div className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border select-none ${
-                isDark ? "bg-slate-900/50 border-slate-800/60" : "bg-white border-slate-200 shadow-sm"
+                isDark ? "bg-[#1F1F23]/80 border-[#2E2E33]" : "bg-white border-slate-200 shadow-sm"
               }`}>
-                <Clock className="w-4 h-4 text-cyan-400" />
+                <Clock className="w-4 h-4 text-[#E8EA7A]" />
                 <span className="text-xs font-bold">{timeString || "12:37"}</span>
                 <div className="w-px h-3 bg-slate-850" />
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -1927,10 +2093,10 @@ export default function Home() {
             <div className="hidden lg:block lg:col-span-4 space-y-6">
               {/* User Profile Card */}
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 flex flex-col items-center text-center ${
-                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <div className="relative group mb-3">
-                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-60 blur-xs" />
+                  <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-[#E8EA7A] to-[#3D1B5C] opacity-60 blur-xs" />
                   <div className="relative w-16 h-16 rounded-full overflow-hidden border-[2.5px] border-slate-950 bg-slate-900">
                     <img
                       src={currentUser?.avatarUrl || avatar}
@@ -1944,1456 +2110,14 @@ export default function Home() {
               </div>
 
               <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 ${
-                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
+                isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200 shadow-md"
               }`}>
                 <h3 className={`text-xs font-extrabold uppercase tracking-wider mb-4 px-1.5 ${isDark ? "text-slate-400" : "text-black"}`}>Settings Hub</h3>
                 
                 <div className="space-y-1.5">
-                  <button
-                    onClick={() => setActiveSection("profile")}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
-                      activeSection === "profile"
-                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
-                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
-                    }`}
-                  >
-                    <UserIcon className="w-4.5 h-4.5" />
-                    <span>Account Details</span>
-                  </button>
-
-                  <button
-                    onClick={() => setActiveSection("security")}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer ${
-                      activeSection === "security"
-                        ? "bg-gradient-to-r from-cyan-500/15 via-blue-500/15 to-indigo-500/15 text-cyan-400 border-cyan-500/30 shadow-md shadow-cyan-500/5"
-                        : "bg-black/40 border-slate-900 text-slate-400 hover:text-slate-200 hover:border-slate-800"
-                    }`}
-                  >
-                    <Lock className="w-4.5 h-4.5" />
-                    <span>Password & Security</span>
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-3 p-3.5 rounded-2xl font-black text-xs.5 transition-all text-left border cursor-pointer bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300"
-                  >
-                    <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                    </svg>
-                    <span>Log Out</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className={`border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
-
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-cyan-400" />
-                  <h3 className={`text-xs font-extrabold uppercase tracking-wider ${isDark ? "text-slate-350" : "text-black"}`}>Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-slate-800 flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-cyan-400 transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className={`text-[10px] leading-normal ${isDark ? "text-slate-400" : "text-black"}`}>
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-slate-850/50 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-cyan-500" : "bg-slate-800"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="lg:col-span-8 w-full space-y-4">
-              <div className={`flex lg:hidden gap-1.5 p-1.5 rounded-2xl border transition-colors duration-500 ${
-                isDark ? "bg-slate-950/40 border-slate-800/80" 
-                  : "bg-white border-slate-200 shadow-sm"
-              }`}>
-                <button
-                  type="button"
-                  onClick={() => setActiveSection("profile")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
-                    activeSection === "profile"
-                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200"
-                      : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
-                  }`}
-                >
-                  <UserIcon className="w-4 h-4" />
-                  <span>Account</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveSection("security")}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs.5 transition-all cursor-pointer ${
-                    activeSection === "security"
-                      ? isDark ? "bg-gradient-to-r from-cyan-500/15 to-indigo-500/15 text-cyan-400 border border-cyan-500/20"
-                        : "bg-cyan-50 text-cyan-600 border border-cyan-200"
-                      : isDark ? "text-slate-400 hover:text-slate-200" : "text-slate-500"
-                  }`}
-                >
-                  <Lock className="w-4 h-4" />
-                  <span>Security</span>
-                </button>
-              </div>
-
-              {/* Mobile User Profile Card & Log Out */}
-              <div className={`flex lg:hidden flex-col sm:flex-row items-center justify-between gap-4 p-4 border rounded-[24px] transition-all duration-500 ${
-                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-sm"
-              }`}>
-                <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
-                  <div className="relative group flex-shrink-0">
-                    <div className="absolute -inset-0.5 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-60 blur-xs" />
-                    <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-slate-950 bg-slate-900">
-                      <img
-                        src={currentUser?.avatarUrl || avatar}
-                        alt={currentUser?.username || name}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-extrabold truncate">{currentUser?.username || name}</h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{currentUser?.email || email}</p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleLogout}
-                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-bold text-xs transition-all border cursor-pointer bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20 hover:text-red-300 active:scale-95"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                  </svg>
-                  <span>Log Out</span>
-                </button>
-              </div>
-              
-              {activeSection === "profile" && (
-                <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
-                }`}>
-                  <form onSubmit={handleSaveProfile} className="space-y-6">
-                    <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
-                      <div className="flex items-center gap-2">
-                        <UserIcon className="w-5 h-5 text-cyan-400" />
-                        <h2 className="text-lg font-black tracking-wide">Account Profile Details</h2>
-                      </div>
-                      <span className="text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-bold">Information</span>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2 text-left">
-                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Full Name</label>
-                          <input
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
-                            placeholder="Your full name..."
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-2 text-left">
-                          <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Username</label>
-                          <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            onBlur={checkUsernameAvailability}
-                            className={`w-full border rounded-2xl px-4 py-3.5 text-xs.5 outline-none transition duration-300 ${isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"}`}
-                            placeholder="Your username..."
-                            required
-                          />
-                          {usernameAvailable === false && (
-                            <p className="text-rose-400 text-xs mt-1">Username already taken</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Email Address</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                            <Mail className="w-4 h-4" />
-                          </span>
-                          <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            className={`w-full border rounded-2xl pl-12 pr-4 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
-                            placeholder="your.email@domain.com"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-left">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Bio Details</label>
-                        <textarea
-                          rows={3}
-                          value={bio}
-                          onChange={(e) => setBio(e.target.value)}
-                          className={`w-full border rounded-2xl p-4.5 text-xs.5 outline-none transition duration-300 resize-none ${
-                            isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                              : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                          }`}
-                          placeholder="Write something about yourself..."
-                        />
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full group bg-gradient-to-r from-cyan-500 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-slate-950 font-black py-4 rounded-2xl text-xs.5 transition-all shadow-[0_8px_25px_rgba(6,182,212,0.2)] flex items-center justify-center gap-1.5 mt-4 select-none cursor-pointer"
-                    >
-                      <Save className="w-4.5 h-4.5" /> Save Account Profile Details
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {activeSection === "security" && (
-                <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
-                  isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
-                }`}>
-                  <form onSubmit={handleSavePassword} className="space-y-6">
-                    <div className="border-b border-slate-850/50 pb-4 flex items-center justify-between select-none">
-                      <div className="flex items-center gap-2">
-                        <Lock className="w-5 h-5 text-indigo-400" />
-                        <h2 className="text-lg font-black tracking-wide">Change Password Settings</h2>
-                      </div>
-                      <span className="text-[10px] text-slate-500 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-full font-bold">Authentication</span>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Current Password</label>
-                        <div className="relative">
-                          <input
-                            type={showCurrentPassword ? "text" : "password"}
-                            value={currentPassword}
-                            onChange={(e) => setCurrentPassword(e.target.value)}
-                            className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
-                            placeholder="Type current password..."
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
-                          >
-                            {showCurrentPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>New Password</label>
-                        <div className="relative">
-                          <input
-                            type={showNewPassword ? "text" : "password"}
-                            value={newPassword}
-                            onChange={(e) => setNewPassword(e.target.value)}
-                            className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"}`}
-                            placeholder="Type new secure password..."
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowNewPassword(!showNewPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
-                          >
-                            {showNewPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-                          </button>
-                        </div>
-
-                        {newPassword && (
-                          <div className="mt-3.5 p-4 bg-slate-950/90 rounded-2xl border border-slate-900 space-y-3 select-none text-xs">
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-[10.5px]">
-                                <span className="text-slate-400">Security Index:</span>
-                                <span className={`font-bold ${passwordStrength.text}`}>{passwordStrength.label}</span>
-                              </div>
-                              <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full transition-all duration-500 ${passwordStrength.color}`}
-                                  style={{ width: `${passwordStrength.score}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="pt-2 border-t border-slate-900/60 grid grid-cols-2 gap-2 text-[10.5px]">
-                              <div className="flex items-center gap-1.5">
-                                {hasMinLength ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-700" />}
-                                <span className={hasMinLength ? "text-slate-200" : "text-slate-500"}>8+ Characters</span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                {hasCapital ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-700" />}
-                                <span className={hasCapital ? "text-slate-200" : "text-slate-500"}>Uppercase Letter</span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                {hasNumber ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-700" />}
-                                <span className={hasNumber ? "text-slate-200" : "text-slate-500"}>Number (0-9)</span>
-                              </div>
-
-                              <div className="flex items-center gap-1.5">
-                                {hasSpecial ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <div className="w-3.5 h-3.5 rounded-full border border-slate-700" />}
-                                <span className={hasSpecial ? "text-slate-200" : "text-slate-500"}>Special Symbol</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="space-y-2 text-left relative">
-                        <label className={`text-[11px] font-bold uppercase tracking-widest px-0.5 ${isDark ? "text-slate-400" : "text-black"}`}>Confirm New Password</label>
-                        <div className="relative">
-                          <input
-                            type={showConfirmPassword ? "text" : "password"}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            className={`w-full border rounded-2xl pl-4 pr-11 py-3.5 text-xs.5 outline-none transition duration-300 ${
-                              isDark ? "bg-[#07070A] border-slate-900 text-white focus:border-cyan-500/80 focus:ring-2 focus:ring-cyan-500/10" 
-                                : "bg-slate-50 border-slate-200 text-black font-semibold focus:border-cyan-500 focus:ring-2 focus:ring-cyan-400/10"
-                            }`}
-                            placeholder="Verify new secure password..."
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-cyan-400 transition-colors"
-                          >
-                            {showConfirmPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full bg-white text-slate-950 font-black py-4 rounded-2xl text-xs.5 hover:bg-slate-200 transition-all flex items-center justify-center gap-1.5 mt-4 shadow-md select-none cursor-pointer"
-                    >
-                      <Key className="w-4.5 h-4.5" /> Save New Password
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              <div className={`block lg:hidden border rounded-[28px] p-5 shadow-xl transition-all duration-500 overflow-hidden relative ${
-                isDark ? "bg-[#0A0A0C]/90 border-slate-900" : "bg-white border-slate-200 shadow-md"
-              }`}>
-                <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-cyan-500/5 rounded-full blur-[20px] pointer-events-none" />
-
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-cyan-400" />
-                  <h3 className="text-xs font-extrabold uppercase text-slate-350 tracking-wider">Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-slate-800 flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-cyan-400 transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-slate-850/50 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-cyan-500" : "bg-slate-800"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-12 text-center text-[10.5px] text-slate-500 select-none z-10">
-          Secure Settings Hub. Encrypted using SHA-256 protocols. Powered by Next.js.
-        </div>
-      </main>
-    );
-  }
-
-  // --- DEFAULT VIEW: CHATROOM ---
-  return (
-    <div className={`w-full h-screen max-h-screen flex flex-col font-sans antialiased overflow-hidden ${
-      theme === "black" 
-        ? "bg-black text-slate-100 black-theme" 
-        : isDark ? "bg-[#252529] text-[#E8E8F0]" 
-          : "bg-[#F5F5FA] text-[#252529]"
-    }`}>
-      
-      {/* 1. TOP NAVBAR - Chatme Style */}
-      <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
-        theme === "black"
-          ? "bg-black border-neutral-900"
-          : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
-      }`}>
-        
-        {/* Left: Logo */}
-        <div className="flex items-center gap-2.5 select-none">
-          <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8EA7A]" : "text-[#252529]"}`}>
-            Chatme
-          </span>
-        </div>
-
-        {/* Center Search bar */}
-        {currentUser && (
-          <div className={`hidden md:flex w-[260px] h-[36px] border rounded-lg items-center px-3 gap-2 ${
-            theme === "black"
-              ? "bg-[#0a0a0a] border-neutral-900"
-              : isDark ? "bg-slate-950 border-slate-800" : "bg-slate-100 border-slate-200"
-          }`}>
-            <svg className="w-4.5 h-4.5 text-slate-400" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-transparent text-sm w-full outline-none text-slate-400 placeholder-slate-450 font-normal"
-            />
-          </div>
-        )}
-
-        {/* Right Nav Icons */}
-        <div className="flex items-center gap-5">
-          {currentUser && (
-            <>
-              {/* Search Icon */}
-              <button className="text-slate-500 hover:text-slate-800 transition-colors hidden sm:block">
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-                </svg>
-              </button>
-              
-              {/* Direct Messages Icon */}
-              <button 
-                onClick={() => setCurrentView("chat")}
-                className="text-slate-500 hover:text-slate-800 transition-colors relative"
-              >
-                <svg className="w-5.5 h-5.5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                </svg>
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1.5 w-4 h-4 rounded-full bg-red-500 text-[9px] font-bold flex items-center justify-center text-white animate-pulse">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-            </>
-          )}
-
-
-          {/* Theme Toggle Button */}
-          <button
-            onClick={() => {
-              setTheme(prev => {
-                const next = prev === "light" ? "dark" : prev === "dark" ? "black" : "light";
-                setToast(next === "light" ? "Light Theme ☀️" : next === "dark" ? "Dark Theme 🌙" : "OLED Black 🌑");
-                setTimeout(() => setToast(null), 2500);
-                return next;
-              });
-            }}
-            className={`w-[44px] h-[24px] rounded-full relative cursor-pointer transition-all duration-300 ${
-              isDark ? "bg-[#E8EA7A]" : "bg-[#D0D0DA]"
-            }`}
-            title={`Toggle Theme`}
-          >
-            <div className={`absolute top-[2px] w-[20px] h-[20px] rounded-full bg-white shadow-md transition-all duration-300 ${
-              isDark ? "left-[22px]" : "left-[2px]"
-            }`} />
-          </button>
-
-          {currentUser && (
-            <>
-              {/* Phone Call Icon */}
-              <button className={`p-2 rounded-lg transition-colors ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                </svg>
-              </button>
-
-              {/* Notification Bell */}
-              <button className={`p-2 rounded-lg transition-colors relative ${isDark ? "text-[#9090B0] hover:text-[#E8EA7A]" : "text-[#6B6B8A] hover:text-[#252529]"}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
-                </svg>
-                {totalUnreadCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#E8EA7A] text-[#252529] text-[9px] font-black flex items-center justify-center">
-                    {totalUnreadCount}
-                  </span>
-                )}
-              </button>
-
-              {/* Logged in user avatar */}
-              <div className="relative group cursor-pointer" onClick={() => {
-                if (currentUser) {
-                  setName(currentUser.username);
-                  setUsername(currentUser.username);
-                  setBio(currentUser.bio || "");
-                  setAvatar(currentUser.avatarUrl);
-                }
-                setNavView("settings");
-                setCurrentView("settings");
-              }}>
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.username}
-                  className="w-8 h-8 rounded-full object-cover border-2 border-[#E8EA7A]/30 hover:border-[#E8EA7A] transition-all"
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </header>
-
-      {/* 2. AUTH / LOGOUT / REGISTER CONTAINER */}
-      {!currentUser ? (
-        <div className={`flex-1 flex items-center justify-center p-6 relative overflow-hidden ${
-          theme === "black"
-            ? "bg-black black-theme"
-            : isDark ? "bg-slate-950" : "bg-slate-50"
-        }`}>
-          {/* Floating background glowing orbs */}
-          <div className="absolute inset-0 pointer-events-none z-0">
-            <div className={`absolute top-[10%] left-[15%] w-[250px] sm:w-[320px] h-[250px] sm:h-[320px] rounded-full blur-[100px] transition-opacity duration-700 animate-float-slow ${
-              isDark ? "bg-indigo-600/15 opacity-100" : "bg-indigo-400/10 opacity-80"
-            }`} />
-            <div className={`absolute bottom-[10%] right-[15%] w-[280px] sm:w-[350px] h-[280px] sm:h-[350px] rounded-full blur-[110px] transition-opacity duration-700 animate-float-medium ${
-              isDark ? "bg-sky-500/15 opacity-100" : "bg-sky-400/10 opacity-80"
-            }`} />
-          </div>
-
-          <div className={`w-full max-w-[420px] rounded-[32px] p-8 shadow-[0_24px_60px_rgba(0,0,0,0.15)] flex flex-col items-center animate-chat-bubble border relative z-10 ${
-            theme === "black"
-              ? "bg-[#050505] border-neutral-900 text-slate-100 black-theme"
-              : isDark ? "glass-card-dark text-slate-100" : "glass-card-light text-slate-800"
-          }`}>
-            <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-sky-500/40 to-transparent" />
-            
-            <div className="w-14 h-14 rounded-2xl overflow-hidden mb-4 shadow-lg flex items-center justify-center bg-white border border-slate-200">
-              <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
-            </div>
-
-            <h2 className={`text-2xl font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-              {authMode === "login" ? "Welcome Back" : "Create Account"}
-            </h2>
-            <p className="text-[12px] text-slate-400 text-center mb-6 leading-relaxed">
-              {authMode === "login" 
-                ? "Enter your credentials to access your profile and conversations." 
-                : "Sign up with an email and username to connect with others."}
-            </p>
-
-            {authError && (
-              <div className="w-full mb-4 px-4 py-2.5 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-500 text-xs font-bold flex items-center gap-2">
-                <svg className="w-4.5 h-4.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <span>{authError}</span>
-              </div>
-            )}
-
-            {authMode === "login" ? (
-              /* LOGIN FORM */
-              <form onSubmit={handleLogin} className="w-full flex flex-col gap-4">
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Username or Email Address</label>
-                  <input
-                    type="text"
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    placeholder="e.g. paul or paul@chatgroup.com"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
-                  <input
-                    type="password"
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthLoading}
-                  className={`w-full py-3.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 font-bold text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm mt-2 cursor-pointer ${
-                    isAuthLoading ? "opacity-70 cursor-not-allowed" : "hover:brightness-110"
-                  }`}
-                >
-                  {isAuthLoading ? "Signing In..." : "Sign In"}
-                </button>
-
-
-                <p className="text-[11.5px] text-slate-450 text-center mt-3 font-semibold">
-                  Don't have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("register");
-                      setAuthError(null);
-                    }}
-                    className="text-sky-500 hover:underline font-bold"
-                  >
-                    Sign Up
-                  </button>
-                </p>
-              </form>
-            ) : (
-              /* REGISTER FORM */
-              <form onSubmit={handleRegister} className="w-full flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Select Face</span>
-                  <div className="grid grid-cols-6 gap-2">
-                    {PRESET_AVATARS.map((avatarItem, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setSelectedAvatarUrl(avatarItem)}
-                        className={`relative w-9 h-9 rounded-full overflow-hidden border-2 transition-all duration-200 hover:scale-110 active:scale-90 shadow-sm ${
-                          selectedAvatarUrl === avatarItem 
-                            ? "border-sky-500 ring-2 ring-sky-500/20 scale-105" 
-                            : "border-transparent opacity-70 hover:opacity-100"
-                        }`}
-                      >
-                        <img src={avatarItem} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Username</label>
-                  <input
-                    type="text"
-                    value={regUsername}
-                    onChange={(e) => setRegUsername(e.target.value)}
-                    placeholder="e.g. ann123"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Email Address</label>
-                  <input
-                    type="email"
-                    value={regEmail}
-                    onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="e.g. ann@example.com"
-                    className={`w-full px-4 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                      isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                        : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                    }`}
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-2 relative">
-                  <label className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showRegPassword ? "text" : "password"}
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Create a password"
-                      className={`w-full pl-4 pr-11 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                        isDark ? "bg-slate-900/50 border-slate-800 text-white placeholder-slate-500 focus:border-sky-500 focus:ring-sky-500/10" 
-                          : "bg-white border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500 focus:ring-sky-500/10 shadow-sm"
-                      }`}
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowRegPassword(!showRegPassword)}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 transition-colors"
-                    >
-                      {showRegPassword ? <EyeOff className="w-4.5 h-4.5" /> : <Eye className="w-4.5 h-4.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isAuthLoading}
-                  className={`w-full py-3.5 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 font-bold text-white rounded-2xl shadow-lg shadow-blue-500/20 active:scale-95 transition-all text-sm mt-2 cursor-pointer ${
-                    isAuthLoading ? "opacity-70 cursor-not-allowed" : "hover:brightness-110"
-                  }`}
-                >
-                  {isAuthLoading ? "Creating Account..." : "Create Account"}
-                </button>
-                <p className="text-[11.5px] text-slate-450 text-center mt-3 font-semibold">
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode("login");
-                      setAuthError(null);
-                    }}
-                    className="text-sky-500 hover:underline font-bold"
-                  >
-                    Sign In
-                  </button>
-                </p>
-              </form>
-            )}
-          </div>
-        </div>
-      ) : (
-        /* MAIN LAYOUT: NAV SIDEBAR + CONTENT */
-        <div className="flex-1 flex overflow-hidden w-full relative">
-          
-          {/* LEFT NAVIGATION SIDEBAR */}
-          <nav className={`hidden md:flex w-[200px] flex-shrink-0 flex-col border-r transition-all duration-300 ${
-            theme === "black"
-              ? "bg-black border-neutral-900"
-              : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-[#EEEEF5] border-[#E0E0EA]"
-          }`}>
-            {/* User Profile Section */}
-            <div className={`p-5 border-b ${isDark ? "border-[#2E2E33]" : "border-[#E0E0EA]"}`}>
-              <div className="flex items-center gap-3">
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.username}
-                  className="w-10 h-10 rounded-full object-cover border-2 border-[#E8EA7A]/30"
-                />
-                <div className="min-w-0">
-                  <h3 className={`text-sm font-bold truncate ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>
-                    {currentUser.username}
-                  </h3>
-                  <p className="text-[10px] text-emerald-400 font-semibold">Available</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Nav Items */}
-            <div className="flex-1 py-4 px-3 space-y-1">
-              <button
-                onClick={() => { setNavView("chat"); setCurrentView("chat"); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
-                  navView === "chat"
-                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
-                }`}
-              >
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
-                </svg>
-                Chat
-              </button>
-
-              <button
-                onClick={() => { setNavView("group"); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
-                  navView === "group"
-                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
-                }`}
-              >
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
-                </svg>
-                Group
-              </button>
-
-              <button
-                onClick={() => {
-                  setNavView("settings");
-                  if (currentUser) {
-                    setName(currentUser.username);
-                    setUsername(currentUser.username);
-                    setBio(currentUser.bio || "");
-                    setAvatar(currentUser.avatarUrl);
-                  }
-                  setCurrentView("settings");
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
-                  navView === "settings"
-                    ? isDark ? "bg-[#E8EA7A]/12 text-[#E8EA7A] border border-[#E8EA7A]/15" : "bg-[#E8EA7A]/10 text-[#9A9C2D] border border-[#E8EA7A]/20"
-                    : isDark ? "text-[#9090B0] hover:bg-[#2E2E33] hover:text-[#E8E8F0] border border-transparent" : "text-[#6B6B8A] hover:bg-[#E0E0EA] hover:text-[#252529] border border-transparent"
-                }`}
-              >
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Setting
-              </button>
-            </div>
-
-            {/* Logout at bottom */}
-            <div className={`p-3 border-t ${isDark ? "border-[#2E2E33]" : "border-[#E0E0EA]"}`}>
-              <button
-                onClick={handleLogout}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] font-semibold transition-all cursor-pointer ${
-                  isDark ? "text-rose-400 hover:bg-rose-500/10" : "text-rose-500 hover:bg-rose-50"
-                }`}
-              >
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                </svg>
-                Logout
-              </button>
-            </div>
-          </nav>
-
-          {/* COLUMN 1: CHAT LIST (320px) */}
-          <section 
-            className={`border-r flex flex-col flex-shrink-0 transition-all duration-300 relative ${
-              theme === "black"
-                ? "bg-black border-neutral-900"
-                : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
-            } ${
-              activeContact 
-                ? "hidden md:flex w-[320px] h-full" 
-                : "w-full md:w-[320px] h-full"
-            }`}
-          >
-            <div className="p-4 flex flex-col gap-3">
-              {/* Search Bar */}
-              <div className={`w-full h-[38px] border rounded-xl flex items-center px-3 gap-2 ${
-                theme === "black"
-                  ? "bg-[#0a0a0a] border-neutral-900"
-                  : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-[#F0F0F8] border-[#E0E0EA]"
-              }`}>
-                <svg className="w-4 h-4 text-[#6B6B8A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`bg-transparent text-sm w-full outline-none font-normal ${isDark ? "text-[#E8E8F0] placeholder-[#6B6B8A]" : "text-[#252529] placeholder-[#9090B0]"}`}
-                />
-              </div>
-              
-              <div className="flex justify-between items-center text-xs text-slate-450 font-bold tracking-wide">
-                <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-650">
-                  <span>Latest First</span>
-                  <svg className="w-3 h-3 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-              {filteredContacts.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
-              ) : (
-                filteredContacts.map((user) => {
-                  const isOnline = onlineUsers[user.username] === "online";
-                  const isAway = onlineUsers[user.username] === "away";
-                  const isTyping = typingUsers[user.username];
-                  const isActive = activeContact?.username === user.username;
-                  const lastMsg = getLastMessage(user.username);
-                  const rel = getChatRelationship(user.username);
                   
 
-                  return (
-                    <button
-                      key={user.username}
-                      onClick={() => {
-                        setActiveContact(user);
-                        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-                          setIsDetailPaneOpen(false);
-                        }
-                      }}
-                      className={`w-full p-3 flex items-center gap-3 rounded-xl relative transition-all duration-200 ${
-                        isActive
-                          ? isDark ? "bg-[#2E2E33] border border-[#2E2E33]" 
-                            : "bg-[#E8E8F0] border border-[#D0D0DA]"
-                          : isDark ? "border border-transparent hover:bg-[#2E2E33]/60" 
-                            : "border border-transparent hover:bg-[#F0F0F8]"
-                      }`}
-                    >
-                      <div className="relative flex-shrink-0">
-                        <div className="w-[46px] h-[46px] rounded-full overflow-hidden">
-                          <img 
-                            src={user.avatarUrl} 
-                            className="w-full h-full rounded-full object-cover" 
-                          />
-                        </div>
-                        
-                        <span className={`absolute top-0 right-0 w-2.5 h-2.5 rounded-full border-2 ${
-                          isDark ? "border-[#252529]" : "border-white"
-                        } ${
-                          isTyping ? "bg-amber-400 animate-pulse" :
-                          isOnline ? "bg-emerald-500 pulse-online" :
-                          isAway ? "bg-amber-500" : "bg-slate-400"
-                        }`} />
-                      </div>
-                      
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex justify-between items-center mb-0.5">
-                          <span className={`text-[13px] font-bold truncate ${
-                            isDark ? "text-[#E8E8F0]" : "text-[#252529]"
-                          }`}>
-                            {user.username}
-                          </span>
-                          {lastMsg ? (
-                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>{lastMsg.time}</span>
-                          ) : (
-                            <span className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>08:04 AM</span>
-                          )}
-                        </div>
-                        
-                        <div className={`text-[11.5px] truncate leading-snug ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
-                          {isTyping ? (
-                            <span className="text-purple-500 font-bold animate-pulse">typing...</span>
-                          ) : rel && rel.status === 'pending' ? (
-                            rel.sender.toLowerCase() === currentUser.username.toLowerCase()
-                              ? <span className="text-amber-500 font-bold">Request Pending ✉️</span>
-                              : <span className="text-sky-500 font-bold animate-pulse">Wants to Chat! ✉️</span>
-                          ) : rel && rel.status === 'declined' ? (
-                            <span className="text-rose-500 font-bold">Request Declined ❌</span>
-                          ) : lastMsg ? (
-                            <span>{lastMsg.text || "📷 Photo attachment"}</span>
-                          ) : (
-                            <span>{user.statusText || "Start DM"}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {rel && rel.status === 'pending' && rel.recipient.toLowerCase() === currentUser.username.toLowerCase() ? (
-                        <span className="absolute right-3 px-1.5 py-0.5 rounded-full bg-[#E8EA7A] text-[9px] font-black text-[#252529] flex items-center justify-center select-none shadow animate-pulse">
-                          REQ
-                        </span>
-
-                      ) : null}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Golden + FAB for new chat */}
-            <button
-              className="fab-new-chat"
-              title="New Chat"
-            >
-              <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </button>
-          </section>
-
-          {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM */}
-          <main 
-            className={`flex-1 flex flex-col border-r transition-all duration-300 ${
-              theme === "black"
-                ? "bg-black border-neutral-900"
-                : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
-            } ${
-              !activeContact 
-                ? "hidden md:flex h-full items-center justify-center text-center p-8" 
-                : "flex h-full"
-            }`}
-          >
-            {activeContact ? (
-              <>
-                {/* Active Chat Header */}
-                <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
-                  theme === "black"
-                    ? "bg-black border-neutral-900"
-                    : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
-                }`}>
-                  <div className="flex items-center gap-3">
-                    <button 
-                      onClick={() => setActiveContact(null)}
-                      className="md:hidden p-1.5 rounded-full text-slate-500 hover:text-slate-800 active:scale-95"
-                    >
-                      <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                      </svg>
-                    </button>
-
-                    <div className="relative">
-                      <img
-                        src={activeContact.avatarUrl}
-                        alt={activeContact.username}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200"
-                      />
-                      <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border border-white ${
-                        typingUsers[activeContact.username] ? "bg-amber-400 animate-pulse" :
-                        onlineUsers[activeContact.username] === "online" ? "bg-emerald-500" :
-                        onlineUsers[activeContact.username] === "away" ? "bg-amber-500" : "bg-slate-400"
-                      }`} />
-                    </div>
-                    <div>
-                      <h3 className={`text-sm font-bold ${isDark ? "text-[#E8E8F0]" : "text-[#252529]"}`}>{activeContact.username}</h3>
-                      <p className={`text-[10px] font-medium ${isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}`}>
-                        {typingUsers[activeContact.username] ? "typing..." : "Last seen 04.10 pm"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    {/* Audio Call Button */}
-                    {isAccepted && (
-                      <button
-                        onClick={() => startCall("audio")}
-                        title="Audio Call"
-                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer"
-                      >
-                        <svg className="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                        </svg>
-                      </button>
-                    )}
-
-                    {/* Video Call Button */}
-                    {isAccepted && (
-                      <button
-                        onClick={() => startCall("video")}
-                        title="Video Call"
-                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-slate-100/10 text-slate-400 hover:text-slate-700 transition-all active:scale-90 cursor-pointer"
-                      >
-                        <svg className="w-5 h-5 stroke-[2.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </header>
-
-                <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-4 custom-scrollbar flex flex-col ${
-                  theme === "black" ? "bg-black" : isDark ? "bg-[#252529]" : "bg-[#F5F5FA]"
-                }`}>
-
-                  {conversationMessages.map((msg) => {
-                    const isMe = msg.sender === currentUser.username;
-                    
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex w-full items-end gap-2.5 ${
-                          isMe ? "justify-end" : "justify-start"
-                        } ${msg.isNew ? "animate-chat-bubble" : ""}`}
-                      >
-                        {!isMe && (
-                          <img
-                            src={activeContact.avatarUrl}
-                            alt={activeContact.username}
-                            className="w-[28px] h-[28px] rounded-full object-cover border border-slate-200 flex-shrink-0 select-none mb-1"
-                          />
-                        )}
-
-                        <div className="flex flex-col max-w-[70%]">
-                          <div
-                            className={`px-4 py-2.5 rounded-[18px] text-[14px] leading-relaxed break-words relative ${
-                              isMe
-                                ? "bg-[#3D1B5C] text-[#FFFFFF] rounded-br-sm shadow-sm"
-                                : isDark ? "bg-[#2E2E33] text-[#E8E8F0] rounded-bl-sm border border-[#2E2E33]"
-                                  : "bg-[#F0F0F8] text-[#252529] rounded-bl-sm border border-[#E0E0EA]"
-                            }`}
-                          >
-                            {msg.text && <p className="font-normal">{msg.text}</p>}
-                            
-                            {msg.imageUrl && (
-                              <img
-                                src={msg.imageUrl}
-                                alt="Attachment"
-                                className="rounded-lg max-h-[220px] object-cover mt-1 select-none border border-slate-700/20"
-                              />
-                            )}
-
-                            <div className="flex items-center justify-end mt-1 text-[9px] font-medium select-none">
-                              <span className={isMe ? "text-[#FFFFFF]/70" : isDark ? "text-[#6B6B8A]" : "text-[#9090B0]"}>{msg.time}</span>
-                              {isMe && msg.status && renderCheckmarks(msg.status)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {isMe && (
-                          <img
-                            src={currentUser.avatarUrl}
-                            alt={currentUser.username}
-                            className="w-[28px] h-[28px] rounded-full object-cover border border-slate-200 flex-shrink-0 select-none mb-1"
-                          />
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* typing status indicator visual overlay */}
-                  {typingUsers[activeContact.username] && (
-                    <div className="flex w-full items-end gap-2.5 justify-start animate-chat-bubble">
-                      <img
-                        src={activeContact.avatarUrl}
-                        alt={activeContact.username}
-                        className="w-[28px] h-[28px] rounded-full object-cover border border-slate-200 flex-shrink-0 mb-1"
-                      />
-                      <div className={`px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-sm ${
-                        isDark ? "bg-slate-800 text-slate-100" : "bg-slate-100 text-slate-800"
-                      }`}>
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-450 animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-450 animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-450 animate-bounce" style={{ animationDelay: "300ms" }} />
-                      </div>
-                    </div>
-                  )}
-
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Floating input dock or Message Request Panel */}
-                {isAccepted ? (
-                  <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
-                    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-lg ${
-                      isDark ? "bg-slate-905/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
-                        : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
-                    }`}>
-                      <input
-                        type="file"
-                        ref={chatImageInputRef}
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleChatImageChange}
-                      />
-                      {/* Photo Gallery Upload Button */}
-                      <button 
-                        onClick={() => chatImageInputRef.current?.click()}
-                        title="Upload photo from device storage"
-                        className="p-1.5 rounded-full text-slate-500 hover:text-sky-500 hover:bg-slate-100/10 transition-all active:scale-90 cursor-pointer"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                        </svg>
-                      </button>
-
-                      {/* Live Snap Web Camera Button */}
-                      <button 
-                        onClick={startLiveCamera}
-                        title="Click photo live"
-                        className="p-1.5 rounded-full text-slate-500 hover:text-sky-500 hover:bg-slate-100/10 transition-all active:scale-90 cursor-pointer"
-                      >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15a2.25 2.25 0 0 0 2.25-2.25V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM18 10.5h.008v.008H18V10.5Z" />
-                        </svg>
-                      </button>
-
-                      {/* Emoji Picker Popover Wrapper */}
-                      <div className="relative" ref={emojiPickerRef}>
-                        <button 
-                          onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
-                          title="Insert emoji"
-                          className={`p-1.5 rounded-full hover:bg-slate-100/10 transition-all active:scale-90 cursor-pointer ${
-                            isEmojiPickerOpen ? "text-sky-500 bg-slate-100/10" : "text-slate-500 hover:text-sky-500"
-                          }`}
-                        >
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
-                          </svg>
-                        </button>
-
-                        {isEmojiPickerOpen && (
-                          <div className={`absolute bottom-[52px] left-0 w-[270px] border rounded-2xl p-3 shadow-xl flex flex-col z-50 animate-chat-bubble select-none ${
-                            isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-                          }`}>
-                            <div className="flex justify-between items-center border-b border-slate-150/10 pb-2 mb-2">
-                              {EMOJI_CATEGORIES.map((cat) => (
-                                <button
-                                  type="button"
-                                  key={cat.name}
-                                  onClick={() => setActiveEmojiCategory(cat.name)}
-                                  title={cat.name}
-                                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-sm transition-all active:scale-95 cursor-pointer ${
-                                    activeEmojiCategory === cat.name ? "bg-slate-100/10 text-slate-350" : "opacity-50 hover:opacity-100"
-                                  }`}
-                                >
-                                  {cat.icon}
-                                </button>
-                              ))}
-                            </div>
-
-                            <div className="grid grid-cols-7 gap-1.5 overflow-y-auto max-h-[140px] custom-scrollbar p-1">
-                              {EMOJI_CATEGORIES.find((c) => c.name === activeEmojiCategory)?.list.map((emoji) => (
-                                <button
-                                  type="button"
-                                  key={emoji}
-                                  onClick={() => setInputText((prev) => prev + emoji)}
-                                  className="w-8 h-8 flex items-center justify-center text-[18px] hover:bg-slate-100/10 active:scale-90 rounded-lg transition-all cursor-pointer"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 relative">
-                        <input
-                          type="text"
-                          value={inputText}
-                          onChange={(e) => {
-                            setInputText(e.target.value);
-                            handleUserTyping(e.target.value.length);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              handleSendMessage();
-                            }
-                          }}
-                          placeholder="Type a message..."
-                          className={`w-full pl-4 pr-12 py-3 border rounded-2xl outline-none text-sm font-medium transition-all focus:ring-4 ${
-                            isDark ? "bg-[#04060a] border-slate-850 text-white placeholder-slate-500 focus:border-sky-500/50 focus:ring-sky-500/5" 
-                              : "bg-slate-50 border-slate-200 text-slate-800 placeholder-slate-400 focus:border-sky-500/50 focus:ring-sky-500/5"
-                          }`}
-                        />
-                        <button
-                          onClick={() => handleSendMessage()}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 w-8.5 h-8.5 rounded-xl bg-[#E8EA7A] text-[#1E1E22] hover:bg-[#F3F59B] flex items-center justify-center active:scale-95 hover:scale-105 transition-all shadow-md shadow-[#E8EA7A]/20 rounded-full cursor-pointer"
-                          disabled={!inputText.trim()}
-                        >
-                          <svg className="w-[15px] h-[15px] rotate-45 -translate-x-[0.5px] stroke-[2.8] text-[#1E1E22]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-transparent select-none flex-shrink-0 z-40">
-                    <div className={`p-6 rounded-[28px] border flex flex-col items-center justify-center text-center gap-4 shadow-lg ${
-                      isDark ? "bg-[#080B12]/90 border-slate-800/80 backdrop-blur-md shadow-black/20" 
-                        : "bg-white/95 border-slate-200 backdrop-blur-md shadow-slate-200/50"
-                    }`}>
-                      {activeRelationship === null && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-slate-400">
-                            You need to send a message request to start chatting with {activeContact.username}.
-                          </p>
-                          <button
-                            onClick={() => sendChatRequest(activeContact.username)}
-                            className="px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-sky-500/10 active:scale-95 transition-all cursor-pointer"
-                          >
-                            Send Message Request
-                          </button>
-                        </div>
-                      )}
-
-                      {activeRelationship !== null && activeRelationship.status === "pending" && (
-                        <>
-                          {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase() ? (
-                            <div className="flex flex-col items-center gap-2">
-                              <span className="relative flex h-2.5 w-2.5">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
-                              </span>
-                              <p className="text-xs font-bold text-amber-550">
-                                Message request pending approval...
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <p className="text-xs font-bold text-slate-400">
-                                {activeContact.username} wants to send you messages. Do you accept?
-                              </p>
-                              <div className="flex justify-center gap-3">
-                                <button
-                                  onClick={() => updateChatRequest(activeRelationship.id, "accepted")}
-                                  className="px-6 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-emerald-500/10 active:scale-95 transition-all cursor-pointer"
-                                >
-                                  Accept
-                                </button>
-                                <button
-                                  onClick={() => updateChatRequest(activeRelationship.id, "declined")}
-                                  className="px-6 py-2.5 bg-gradient-to-r from-rose-500 to-pink-600 hover:brightness-110 text-white font-extrabold text-xs rounded-2xl shadow-md shadow-rose-500/10 active:scale-95 transition-all cursor-pointer"
-                                >
-                                  Decline
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {activeRelationship !== null && activeRelationship.status === "declined" && (
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold text-rose-500">
-                            {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase()
-                              ? "Your request was declined by the recipient."
-                              : "You declined this message request."}
-                          </p>
-                          <button
-                            onClick={() => sendChatRequest(activeContact.username)}
-                            className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-2xl transition-all cursor-pointer"
-                          >
-                            {activeRelationship.sender.toLowerCase() === currentUser.username.toLowerCase()
-                              ? "Try Resending Request"
-                              : "Change Mind: Accept Request"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className={`flex-1 flex flex-col items-center justify-center text-center p-8 select-none ${
-                isDark ? "bg-black" : "bg-slate-50"
-              }`}>
-                <div className={`w-20 h-20 rounded-full border flex items-center justify-center text-slate-400 mb-4 shadow-sm ${
-                  isDark ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
-                }`}>
-                  <svg className="w-10 h-10 stroke-[1.2]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                  </svg>
-                </div>
-                <h2 className="text-[17px] font-bold text-slate-500 uppercase tracking-widest">Your Messages</h2>
-                <p className="text-[12px] text-slate-450 max-w-[240px] mt-2 leading-relaxed">
-                  Send private messages and media photos to a friend or group. Select a conversation to start.
-                </p>
-              </div>
-            )}
-          </main>
-
-          {/* COLUMN 3: RIGHT PANEL - CONTACT DETAIL INFO DISPLAY (320px) */}
-          {activeContact && isDetailPaneOpen && (
-            <aside 
-              className={`w-full lg:w-[320px] border-l flex flex-col items-center text-center select-none z-45 animate-chat-bubble absolute lg:static top-0 right-0 h-full lg:h-auto shadow-2xl lg:shadow-none overflow-y-auto ${
-                theme === "black" ? "bg-black border-neutral-900" : isDark ? "bg-[#1F1F23] border-[#2E2E33]" : "bg-white border-slate-200"
-              }`}
-            >
-              {/* Cover Banner Cover */}
-              <div className="w-full h-24 bg-gradient-to-r from-sky-500/20 via-indigo-500/20 to-purple-500/20 relative flex-shrink-0">
-                <button 
-                  onClick={() => setIsDetailPaneOpen(false)}
-                  className="lg:hidden absolute top-4 right-4 p-2 bg-slate-900/60 text-white rounded-full backdrop-blur-sm hover:bg-slate-900 transition-colors"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Profile Avatar */}
-              <div className="relative -mt-12 mb-4 select-none flex-shrink-0 z-10">
-                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-sky-500 via-indigo-500 to-purple-600 opacity-60 blur-xs" />
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-slate-950 p-[1.5px] shadow-lg relative bg-slate-900">
-                  <img
-                    src={activeContact.avatarUrl}
-                    alt={activeContact.username}
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                </div>
-              </div>
-
-              <div className="px-6 pb-6 flex-1 flex flex-col items-center">
-                <h2 className={`text-lg font-black tracking-wide mb-1 ${isDark ? "text-slate-100" : "text-slate-800"}`}>
-                  {activeContact.username.toUpperCase()}
-                </h2>
-                
-                <span className="text-[10px] font-extrabold tracking-widest text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-full uppercase mb-5">
-                  {activeContact.category || "MEMBER"}
-                </span>
-
-                <div className={`w-full rounded-2xl p-4 border text-left mb-6 ${
-                  theme === "black" ? "bg-[#070709] border-neutral-900" : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-slate-50 border-slate-150"
-                }`}>
-                  <h4 className="text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Biography</h4>
-                  <p className={`text-xs leading-relaxed ${isDark ? "text-slate-300" : "text-slate-655"}`}>
-                    {activeContact.bio || "No biography provided by this user."}
-                  </p>
-                </div>
-
-                <button className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:brightness-110 hover:shadow-cyan-500/20 text-white font-extrabold text-xs tracking-wider shadow-lg shadow-blue-500/20 active:scale-95 transition-all uppercase cursor-pointer">
-                  View Profile Details
-                </button>
+              
 
                 <div className="flex gap-4 mt-8 select-none">
                   {isAccepted && (
@@ -3401,7 +2125,7 @@ export default function Home() {
                       onClick={() => startCall("video")}
                       title="Video Call"
                       className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
-                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                        isDark ? "bg-slate-900 border-[#2E2E33] text-slate-300 hover:bg-[#2E2E33] hover:text-white" 
                           : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
                       }`}
                     >
@@ -3415,7 +2139,7 @@ export default function Home() {
                       onClick={() => startCall("audio")}
                       title="Voice Call"
                       className={`w-12 h-12 rounded-full flex items-center justify-center active:scale-90 transition-all shadow-md cursor-pointer border ${
-                        isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white" 
+                        isDark ? "bg-slate-900 border-[#2E2E33] text-slate-300 hover:bg-[#2E2E33] hover:text-white" 
                           : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-850"
                       }`}
                     >
@@ -3439,10 +2163,10 @@ export default function Home() {
           <div className="absolute inset-0 bg-radial-gradient from-slate-900 via-slate-950 to-black pointer-events-none opacity-80" />
 
           {/* Main container */}
-          <div className="relative z-10 w-full max-w-4xl h-full md:max-h-[85vh] max-h-screen md:rounded-3xl border border-slate-800 bg-slate-900/60 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden">
+          <div className="relative z-10 w-full max-w-4xl h-full md:max-h-[85vh] max-h-screen md:rounded-3xl border border-[#2E2E33] bg-slate-900/60 backdrop-blur-xl shadow-2xl flex flex-col overflow-hidden">
             
             {/* Call Header info */}
-            <div className="p-4 md:p-6 flex items-center justify-between border-b border-slate-800">
+            <div className="p-4 md:p-6 flex items-center justify-between border-b border-[#2E2E33]">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -3453,7 +2177,7 @@ export default function Home() {
                 </span>
               </div>
 
-              <div className="text-xs bg-slate-800/80 px-3 py-1.5 rounded-full font-mono font-bold tracking-wide">
+              <div className="text-xs bg-[#2E2E33]/80 px-3 py-1.5 rounded-full font-mono font-bold tracking-wide">
                 {currentTime}
               </div>
             </div>
@@ -3465,8 +2189,8 @@ export default function Home() {
               {(callState === "calling" || callState === "ringing") && (
                 <div className="flex flex-col items-center text-center space-y-6 animate-pulse">
                   <div className="relative">
-                    <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-cyan-500 to-indigo-500 opacity-30 blur-md animate-pulse" />
-                    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-slate-850 shadow-xl relative bg-slate-800 p-1">
+                    <div className="absolute -inset-4 rounded-full bg-gradient-to-tr from-[#E8EA7A] to-[#3D1B5C] opacity-30 blur-md animate-pulse" />
+                    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-[#2E2E33] shadow-xl relative bg-[#2E2E33] p-1">
                       <img
                         src={callState === "calling" ? activeContact?.avatarUrl : PRESET_AVATARS[0]}
                         alt="Calling Avatar"
@@ -3507,7 +2231,7 @@ export default function Home() {
 
               {/* If CONNECTED (active streams) */}
               {callState === "connected" && (
-                <div className="w-full h-full relative flex items-center justify-center bg-slate-950 rounded-2xl overflow-hidden border border-slate-800">
+                <div className="w-full h-full relative flex items-center justify-center bg-slate-950 rounded-2xl overflow-hidden border border-[#2E2E33]">
                   {callType === "video" ? (
                     <>
                       {/* Remote video (full stream) */}
@@ -3532,14 +2256,14 @@ export default function Home() {
                       )}
 
                       {/* Floating Vertical Sidebar Call Controls */}
-                      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-30 bg-slate-950/60 backdrop-blur-md p-2.5 rounded-2xl border border-slate-800 shadow-2xl transition-all duration-300">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col gap-3.5 z-30 bg-slate-950/60 backdrop-blur-md p-2.5 rounded-2xl border border-[#2E2E33] shadow-2xl transition-all duration-300">
                         {/* Mute Microphone Button */}
                         <button
                           onClick={toggleMute}
                           className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                             isMicMuted 
                               ? "bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30" 
-                              : "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border border-slate-800/80"
+                              : "bg-slate-900/80 hover:bg-[#2E2E33] text-slate-350 hover:text-white border border-[#2E2E33]/80"
                           }`}
                           title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
                         >
@@ -3560,7 +2284,7 @@ export default function Home() {
                           className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer ${
                             isCameraOff 
                               ? "bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:bg-rose-500/30" 
-                              : "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border border-slate-800/80"
+                              : "bg-slate-900/80 hover:bg-[#2E2E33] text-slate-350 hover:text-white border border-[#2E2E33]/80"
                           }`}
                           title={isCameraOff ? "Turn Video On" : "Turn Video Off"}
                         >
@@ -3581,7 +2305,7 @@ export default function Home() {
                           disabled={videoDevices.length <= 1}
                           className={`w-11 h-11 rounded-xl flex items-center justify-center border transition-all duration-200 ${
                             videoDevices.length > 1
-                              ? "bg-slate-900/80 hover:bg-slate-800 text-slate-350 hover:text-white border-slate-800/80 cursor-pointer"
+                              ? "bg-slate-900/80 hover:bg-[#2E2E33] text-slate-350 hover:text-white border-[#2E2E33]/80 cursor-pointer"
                               : "bg-slate-950/40 text-slate-600 border-slate-900/50 cursor-not-allowed opacity-50"
                           }`}
                           title={videoDevices.length > 1 ? "Flip Camera" : "No other camera available"}
@@ -3606,7 +2330,7 @@ export default function Home() {
                     <div className="flex flex-col items-center text-center space-y-6">
                       <div className="relative">
                         <div className="absolute -inset-4 rounded-full bg-emerald-500/20 opacity-70 blur-md animate-pulse" />
-                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xl bg-slate-800">
+                        <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500 shadow-xl bg-[#2E2E33]">
                           <img
                             src={activeContact?.avatarUrl}
                             alt="Active voice avatar"
@@ -3629,11 +2353,11 @@ export default function Home() {
 
             {/* Call Footer controls */}
             {!(callState === "connected" && callType === "video") && (
-              <div className="p-6 bg-slate-950/80 border-t border-slate-800 flex items-center justify-center gap-6 select-none">
+              <div className="p-6 bg-slate-950/80 border-t border-[#2E2E33] flex items-center justify-center gap-6 select-none">
                 <button
                   onClick={toggleMute}
                   className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                    isMicMuted ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-slate-800 hover:bg-slate-700 text-white"
+                    isMicMuted ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-[#2E2E33] hover:bg-slate-700 text-white"
                   }`}
                   title={isMicMuted ? "Unmute Microphone" : "Mute Microphone"}
                 >
@@ -3652,7 +2376,7 @@ export default function Home() {
                   <button
                     onClick={toggleCamera}
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all cursor-pointer ${
-                      isCameraOff ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-slate-800 hover:bg-slate-700 text-white"
+                      isCameraOff ? "bg-rose-500/20 text-rose-500 border border-rose-500/30" : "bg-[#2E2E33] hover:bg-slate-700 text-white"
                     }`}
                     title={isCameraOff ? "Turn Video On" : "Turn Video Off"}
                   >
@@ -3669,7 +2393,7 @@ export default function Home() {
                 )}
 
                 {callType === "video" && callState === "connected" && videoDevices.length > 0 && (
-                  <div className="relative flex items-center bg-slate-800 hover:bg-slate-700 border border-slate-700/50 rounded-full px-3 py-2 text-white text-xs font-semibold cursor-pointer max-w-[160px] sm:max-w-[200px] transition-all">
+                  <div className="relative flex items-center bg-[#2E2E33] hover:bg-slate-700 border border-slate-700/50 rounded-full px-3 py-2 text-white text-xs font-semibold cursor-pointer max-w-[160px] sm:max-w-[200px] transition-all">
                     <Camera className="w-4 h-4 text-emerald-400 shrink-0 mr-1.5" />
                     <select
                       value={selectedVideoDevice}
@@ -3737,7 +2461,7 @@ export default function Home() {
                 <p className="text-xs font-bold text-rose-500">{liveCameraError}</p>
                 <button
                   onClick={startLiveCamera}
-                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
+                  className="px-6 py-2.5 bg-[#2E2E33] hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition-all cursor-pointer"
                 >
                   Retry Access
                 </button>
@@ -3751,7 +2475,7 @@ export default function Home() {
                   <button 
                     onClick={() => setCapturedPhoto(null)}
                     className={`flex-1 py-3 border rounded-xl font-extrabold text-xs active:scale-95 transition-all cursor-pointer ${
-                      isDark ? "bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-850" : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      isDark ? "bg-slate-900 border-[#2E2E33] text-slate-300 hover:bg-slate-850" : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
                     }`}
                   >
                     Retake
@@ -3788,6 +2512,64 @@ export default function Home() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* Message Forwarding Modal Overlay */}
+      {forwardingMessage && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex flex-col items-center justify-center p-4 select-none animate-fade-in animate-chat-bubble">
+          <div className={`w-full max-w-sm rounded-[24px] border overflow-hidden p-5 flex flex-col gap-4 shadow-2xl ${
+            isDark ? "bg-[#0b0b0d] border-slate-900" : "bg-white border-slate-200"
+          }`}>
+            <div className="w-full flex justify-between items-center pb-2 border-b border-slate-100/10">
+              <h3 className={`text-sm font-extrabold tracking-tight ${isDark ? "text-slate-100" : "text-slate-800"}`}>
+                Forward Message
+              </h3>
+              <button 
+                onClick={() => setForwardingMessage(null)}
+                className="text-slate-500 hover:text-rose-500 hover:scale-110 active:scale-95 transition-all p-1 cursor-pointer"
+                title="Cancel forwarding"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="text-xs text-slate-500 -mt-1 truncate">
+              Select a contact to forward this message to:
+            </div>
+
+            <div className="flex flex-col gap-1 overflow-y-auto max-h-[260px] custom-scrollbar pr-1">
+              {filteredContacts.length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-500 italic">
+                  No other contacts available.
+                </div>
+              ) : (
+                filteredContacts.map((contact) => (
+                  <button
+                    key={contact.username}
+                    onClick={() => handleForwardMessage(contact.username)}
+                    className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all active:scale-98 cursor-pointer ${
+                      isDark ? "hover:bg-slate-900/60 text-slate-200" : "hover:bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    <img 
+                      src={contact.avatarUrl} 
+                      alt={contact.username} 
+                      className="w-8 h-8 rounded-full object-cover border border-slate-200/50 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold truncate">{contact.username}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{contact.email}</div>
+                    </div>
+                    <svg className="w-4 h-4 text-emerald-500 opacity-60 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
