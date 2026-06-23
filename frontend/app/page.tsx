@@ -3232,7 +3232,7 @@ export default function Home() {
         
         {/* Left: Logo */}
         <div className="flex items-center gap-2 select-none">
-          <img src="/logo.png" alt="Logo" className="w-6.5 h-6.5 object-contain" />
+          <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain" />
           <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8EA7A]" : "text-[#252529]"}`}>
             Chitchat
           </span>
