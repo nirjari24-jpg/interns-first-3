@@ -4,7 +4,7 @@
   "description": "Backend API server for ChatGroup",
   "main": "dist/index.js",
   "engines": {
-    "node": ">=20.16.0"
+    "node": "20.x"
   },
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
