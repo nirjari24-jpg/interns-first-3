@@ -54,24 +54,6 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-/* Floating Ambient Orbs */
-@keyframes float-slow {
-  0%, 100% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-25px) scale(1.05); }
-}
-
-@keyframes float-medium {
-  0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); }
-  50% { transform: translateY(20px) scale(0.95) rotate(180deg); }
-}
-
-.animate-float-slow { animation: float-slow 15s ease-in-out infinite; }
-.animate-float-medium { animation: float-medium 20s ease-in-out infinite; }
-
-/* Slide & Fade Animations */
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
 }
 
 @keyframes slideDown {
