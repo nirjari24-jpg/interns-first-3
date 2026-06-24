@@ -15,3 +15,6 @@ node_modules/
 # Local persistent MongoDB memory server directory
 backend/db_persist/
 
+# Local directory junction for frontend app
+frontend/app
+

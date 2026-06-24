@@ -1217,7 +1217,7 @@ export default function Home() {
                   const storedToken = localStorage.getItem("chatgroup_session_token");
                   const reRegBody = {
                     username: parsed.username,
-                    email: parsed.email || `${parsed.username.toLowerCase().replace(/\s+/g, "")}@chitchat.com`,
+                    email: parsed.email || `${parsed.username.toLowerCase().replace(/\s+/g, "")}@gmail.com`,
                     password: storedToken || ("chatgroup_auto_restore_" + parsed.username),
                     avatarUrl: parsed.avatarUrl,
                     category: parsed.category || "MEMBER",
@@ -1311,7 +1311,7 @@ export default function Home() {
       });
 
       const currentActive = activeContactRef.current;
-      if (currentActive && currentActive.username === newMsg.sender) {
+      if (currentActive && currentActive.username === newMsg.sender && currentUser?.username) {
         playSound("receive");
         fetch(`${API_BASE}/api/messages/read`, {
           method: "PUT",
@@ -1498,18 +1498,20 @@ export default function Home() {
         .catch(err => console.warn("Error fetching messages:", err));
 
       // Mark messages as read
-      fetch(`${API_BASE}/api/messages/read`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sender: activeContact.username,
-          recipient: currentUser.username
+      if (activeContact.username && currentUser?.username) {
+        fetch(`${API_BASE}/api/messages/read`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sender: activeContact.username,
+            recipient: currentUser.username
+          })
         })
-      })
-      .then(() => {
-        fetchUnreadMessagesCount();
-      })
-      .catch(err => console.warn("Error marking messages as read:", err));
+        .then(() => {
+          fetchUnreadMessagesCount();
+        })
+        .catch(err => console.warn("Error marking messages as read:", err));
+      }
 
       // Emit read status through WebSockets
       if (socketRef.current && socketRef.current.connected) {
@@ -2320,7 +2322,7 @@ export default function Home() {
             <div className="flex items-center gap-4 text-center sm:text-left flex-col sm:flex-row">
               {/* Back to Chat Trigger */}
               <button
-                onClick={() => setCurrentView("chat")}
+                onClick={() => { setCurrentView("chat"); setNavView("chat"); }}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
                   isDark ? "bg-[#2E2E33] border-[#2E2E33] text-[#E8EA7A] hover:bg-[#35353B]"
                     : "bg-white border-slate-200 text-slate-800 hover:bg-slate-100 shadow-sm"
@@ -3751,7 +3753,8 @@ export default function Home() {
         </div>
       ) : (
         /* MAIN LAYOUT: NAV SIDEBAR + CONTENT */
-        <div className="flex-1 flex overflow-hidden w-full relative">
+        <div className="flex-1 flex flex-col overflow-hidden w-full relative">
+          <div className="flex-1 flex overflow-hidden w-full relative">
           
           {/* LEFT NAVIGATION SIDEBAR */}
           <nav className={`hidden md:flex w-[200px] flex-shrink-0 flex-col border-r transition-all duration-300 ${
@@ -3875,7 +3878,7 @@ export default function Home() {
                 ? "bg-black border-neutral-900"
                 : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
             } ${
-              activeContact 
+              activeContact || (activeGroup && navView === "group")
                 ? "hidden md:flex w-[320px] h-full" 
                 : "w-full md:w-[320px] h-full"
             }`}
@@ -4120,15 +4123,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Golden + FAB for new chat */}
-            <button
-              className="fab-new-chat"
-              title="New Chat"
-            >
-              <svg className="w-5 h-5 stroke-[3]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-            </button>
+
           </section>
 
           {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM / GROUP CHAT */}
@@ -4138,7 +4133,7 @@ export default function Home() {
                 ? "bg-black border-neutral-900"
                 : isDark ? "bg-[#252529] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
             } ${
-              !activeContact && !(activeGroup && navView === "group")
+              !(activeContact && navView === "chat") && !(activeGroup && navView === "group")
                 ? "hidden md:flex h-full items-center justify-center text-center p-8" 
                 : "flex h-full"
             }`}
@@ -4303,7 +4298,7 @@ export default function Home() {
                   </div>
                 </div>
               </>
-            ) : activeContact ? (
+            ) : (activeContact && navView === "chat") ? (
               <>
                 {/* Active Chat Header */}
                 <header className={`h-[56px] px-5 border-b flex items-center justify-between flex-shrink-0 z-40 select-none ${
@@ -5010,6 +5005,83 @@ export default function Home() {
             </aside>
           )}
 
+          </div>
+
+          {/* MOBILE BOTTOM NAVIGATION BAR */}
+          <nav className={`md:hidden flex items-center justify-around h-[58px] border-t px-2 select-none z-45 ${
+            theme === "black" 
+              ? "bg-black border-neutral-900" 
+              : isDark ? "bg-[#1A1A1E] border-[#2E2E33]/60" : "bg-white border-slate-200/60"
+          }`}>
+            <button
+              onClick={() => { setNavView("chat"); setCurrentView("chat"); }}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 transition-all relative ${
+                navView === "chat"
+                  ? isDark ? "text-[#E8EA7A]" : "text-[#9A9C2D]"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+              </svg>
+              <span className="text-[9px] font-black uppercase tracking-wider">Chat</span>
+              {totalUnreadCount > 0 && (
+                <span className="absolute top-1 right-[30%] w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </button>
+
+            <button
+              onClick={() => { setNavView("group"); setCurrentView("chat"); }}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 transition-all ${
+                navView === "group"
+                  ? isDark ? "text-[#E8EA7A]" : "text-[#9A9C2D]"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+              </svg>
+              <span className="text-[9px] font-black uppercase tracking-wider">Group</span>
+            </button>
+
+            <button
+              onClick={() => { setNavView("calls"); setCurrentView("chat"); }}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 transition-all ${
+                navView === "calls"
+                  ? isDark ? "text-[#E8EA7A]" : "text-[#9A9C2D]"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-2.824-1.557-5.118-3.851-6.674-6.674l1.293-.97c.362-.272.528-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+              </svg>
+              <span className="text-[9px] font-black uppercase tracking-wider">Calls</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setNavView("settings");
+                if (currentUser) {
+                  setName(currentUser.username);
+                  setUsername(currentUser.username);
+                  setBio(currentUser.bio || "");
+                  setAvatar(currentUser.avatarUrl);
+                }
+                setCurrentView("settings");
+              }}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1 transition-all ${
+                navView === "settings"
+                  ? isDark ? "text-[#E8EA7A]" : "text-[#9A9C2D]"
+                  : "text-slate-400 dark:text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-[9px] font-black uppercase tracking-wider">Setting</span>
+            </button>
+          </nav>
         </div>
       )}
 
