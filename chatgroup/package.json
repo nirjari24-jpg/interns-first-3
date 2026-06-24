@@ -32,9 +32,9 @@
     "sharp@0.34.5": true
   },
   "optionalDependencies": {
-    "lightningcss-linux-x64-gnu": "1.32.0",
-    "lightningcss-linux-x64-musl": "1.32.0",
     "@tailwindcss/oxide-linux-x64-gnu": "4.3.1",
-    "@tailwindcss/oxide-linux-x64-musl": "4.3.1"
+    "@tailwindcss/oxide-linux-x64-musl": "4.3.1",
+    "lightningcss-linux-x64-gnu": "1.32.0",
+    "lightningcss-linux-x64-musl": "1.32.0"
   }
 }
