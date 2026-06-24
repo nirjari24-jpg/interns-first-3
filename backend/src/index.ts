@@ -122,7 +122,7 @@ const connectDB = async () => {
       });
       const inMemoryUri = mongoMemoryInstance.getUri();
       console.log(`Starting persistent MongoDB server at: ${inMemoryUri} with dbPath: ${dbPersistPath}`);
-      await mongoose.connect(inMemoryUri);
+      await mongoose.connect(inMemoryUri, { dbName: 'chatgroup' });
       console.log('Connected to Persistent MongoMemoryServer Database!');
       await cleanupAiUsers();
       await resetKupiPassword();
@@ -132,7 +132,7 @@ const connectDB = async () => {
       try {
         mongoMemoryInstance = await MongoMemoryServer.create();
         const inMemoryUri = mongoMemoryInstance.getUri();
-        await mongoose.connect(inMemoryUri);
+        await mongoose.connect(inMemoryUri, { dbName: 'chatgroup' });
         console.log('Connected to Volatile Ephemeral MongoDB Database!');
         await cleanupAiUsers();
         await resetKupiPassword();
@@ -420,8 +420,8 @@ app.post('/api/users/register', async (req: Request, res: Response): Promise<any
     return res.status(400).json({ error: 'Invalid username or email address' });
   }
 
-  if (!email.trim().toLowerCase().endsWith('@gmail.com')) {
-    return res.status(400).json({ error: 'Only Gmail addresses are allowed to register.' });
+  if (!email.trim().toLowerCase().includes('@')) {
+    return res.status(400).json({ error: 'A valid email address is required.' });
   }
 
   try {
@@ -511,7 +511,7 @@ app.post('/api/users/login', async (req: Request, res: Response): Promise<any> =
 // Get all users
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
-    const users = await User.find({ email: /@gmail\.com$/i });
+    const users = await User.find({});
     // Exclude password hashes and filter out AI/mock users when listing users
     const safeUsers = users
       .filter(user => {

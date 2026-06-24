@@ -1749,8 +1749,8 @@ export default function Home() {
     if (isAuthLoading) return;
 
     // Basic client-side validation
-    if (!regEmail.trim().toLowerCase().endsWith("@gmail.com")) {
-      setAuthError("Registration is restricted to original @gmail.com email addresses.");
+    if (!regEmail.trim().toLowerCase().includes("@")) {
+      setAuthError("A valid email address is required.");
       return;
     }
 
@@ -2138,7 +2138,6 @@ export default function Home() {
       const isAi = forbidden.some(keyword => usernameLower.includes(keyword) || emailLower.includes(keyword));
       
       return (
-        u.email.toLowerCase().endsWith("@gmail.com") &&
         usernameLower !== currentUser.username.toLowerCase() &&
         usernameLower.includes(searchQuery.toLowerCase()) &&
         !isAi
