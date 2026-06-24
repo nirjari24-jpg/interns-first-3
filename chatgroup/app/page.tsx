@@ -2221,7 +2221,13 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(reqBody)
       })
-      .then(res => res.json())
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to update profile");
+        }
+        return data;
+      })
       .then(updatedUser => {
         setCurrentUser(updatedUser);
         localStorage.setItem("chatgroup_current_user", JSON.stringify(updatedUser));
@@ -2239,7 +2245,7 @@ export default function Home() {
       })
       .catch(err => {
         console.error("Error updating profile:", err);
-        setToast("Error updating profile. Please try again. ❌");
+        setToast(err.message || "Error updating profile. Please try again. ❌");
         setTimeout(() => setToast(null), 3000);
       });
     }
