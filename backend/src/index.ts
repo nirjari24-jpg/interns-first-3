@@ -47,6 +47,24 @@ const emitToUser = (username: string, event: string, data: any) => {
 };
 let mongoMemoryInstance: MongoMemoryServer | null = null;
 
+// Helper to cleanup AI/mock users from the database
+const cleanupAiUsers = async () => {
+  try {
+    const forbiddenKeywords = ['paul', 'ai', 'bot', 'assistant'];
+    const result = await User.deleteMany({
+      $or: forbiddenKeywords.flatMap(k => [
+        { username: { $regex: new RegExp(k, 'i') } },
+        { email: { $regex: new RegExp(k, 'i') } }
+      ])
+    });
+    if (result.deletedCount > 0) {
+      console.log(`[DB CLEANUP] Deleted ${result.deletedCount} AI/mock users from the database.`);
+    }
+  } catch (err: any) {
+    console.error('Error during AI users cleanup:', err.message);
+  }
+};
+
 // Database Connection
 const connectDB = async () => {
   const dbUri = process.env.MONGODB_URI || 'mongodb+srv://nirjari24_db_user:d4D3yahgyg1FZcpg@cluster0.sehzw9g.mongodb.net/chatgroup?appName=Cluster0';
@@ -55,6 +73,7 @@ const connectDB = async () => {
     console.log(`Connecting to MongoDB at: ${dbUri}`);
     await mongoose.connect(dbUri, { serverSelectionTimeoutMS: 2000 });
     console.log('Connected to MongoDB Atlas / Database');
+    await cleanupAiUsers();
   } catch (err: any) {
     console.warn('MongoDB connection error:', err.message);
     console.log('Attempting to start a persistent in-memory MongoDB server as fallback...');
@@ -75,6 +94,7 @@ const connectDB = async () => {
       console.log(`Starting persistent MongoDB server at: ${inMemoryUri} with dbPath: ${dbPersistPath}`);
       await mongoose.connect(inMemoryUri);
       console.log('Connected to Persistent MongoMemoryServer Database!');
+      await cleanupAiUsers();
     } catch (memErr: any) {
       console.error('Failed to start persistent MongoDB fallback server:', memErr.message);
       console.log('Falling back to volatile ephemeral MongoMemoryServer...');
@@ -83,6 +103,7 @@ const connectDB = async () => {
         const inMemoryUri = mongoMemoryInstance.getUri();
         await mongoose.connect(inMemoryUri);
         console.log('Connected to Volatile Ephemeral MongoDB Database!');
+        await cleanupAiUsers();
       } catch (ephErr: any) {
         console.error('Critical: Failed to start any MongoDB server:', ephErr.message);
       }
@@ -459,16 +480,23 @@ app.post('/api/users/login', async (req: Request, res: Response): Promise<any> =
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
     const users = await User.find({ email: /@gmail\.com$/i });
-    // Exclude password hashes when listing users
-    const safeUsers = users.map(user => ({
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      category: user.category,
-      bio: user.bio,
-      statusText: user.statusText
-    }));
+    // Exclude password hashes and filter out AI/mock users when listing users
+    const safeUsers = users
+      .filter(user => {
+        const usernameLower = user.username.toLowerCase();
+        const emailLower = user.email.toLowerCase();
+        const forbidden = ['paul', 'ai', 'bot', 'assistant'];
+        return !forbidden.some(keyword => usernameLower.includes(keyword) || emailLower.includes(keyword));
+      })
+      .map(user => ({
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        category: user.category,
+        bio: user.bio,
+        statusText: user.statusText
+      }));
     res.json(safeUsers);
   } catch (err: any) {
     res.status(500).json({ error: err.message });

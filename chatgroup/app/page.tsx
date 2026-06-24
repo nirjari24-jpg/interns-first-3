@@ -2123,17 +2123,23 @@ export default function Home() {
         (msg.sender === activeContact.username && msg.recipient === currentUser.username))
   );
 
-  // Filters contacts list for sidebar search (real humans with Gmail accounts only)
+  // Filters contacts list for sidebar search (real humans with Gmail accounts only, excluding AI/mock bots)
   const filteredContacts = registeredUsers.filter(
-    (u) =>
-      currentUser &&
-      currentUser.username &&
-      u &&
-      u.username &&
-      u.email &&
-      u.email.toLowerCase().endsWith("@gmail.com") &&
-      u.username.toLowerCase() !== currentUser.username.toLowerCase() &&
-      u.username.toLowerCase().includes(searchQuery.toLowerCase())
+    (u) => {
+      if (!currentUser || !currentUser.username || !u || !u.username || !u.email) return false;
+      
+      const usernameLower = u.username.toLowerCase();
+      const emailLower = u.email.toLowerCase();
+      const forbidden = ['paul', 'ai', 'bot', 'assistant'];
+      const isAi = forbidden.some(keyword => usernameLower.includes(keyword) || emailLower.includes(keyword));
+      
+      return (
+        u.email.toLowerCase().endsWith("@gmail.com") &&
+        usernameLower !== currentUser.username.toLowerCase() &&
+        usernameLower.includes(searchQuery.toLowerCase()) &&
+        !isAi
+      );
+    }
   );
 
   // Get last message info for sidebar preview
@@ -3487,14 +3493,17 @@ export default function Home() {
     }`}>
       
       {/* 1. TOP NAVBAR - Chitchat Style */}
-      <header className={`h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
+      <header className={`relative h-[56px] border-b px-5 flex items-center justify-between z-50 flex-shrink-0 ${
         theme === "black"
           ? "bg-black border-neutral-900"
           : isDark ? "bg-[#2E2E33] border-[#2E2E33]" : "bg-white border-[#E0E0EA]"
       }`}>
         
-        {/* Left: Logo */}
-        <div className="flex items-center gap-2 select-none">
+        {/* Placeholder for flex spacing */}
+        <div />
+
+        {/* Center: Logo with floating animation */}
+        <div className="absolute left-1/2 top-1/2 flex items-center gap-2 select-none animate-float-logo">
           <img src="/logo.png" alt="Logo" className="w-9 h-9 object-contain" />
           <span className={`text-[22px] font-black italic tracking-tight ${isDark ? "text-[#E8EA7A]" : "text-[#252529]"}`}>
             Chitchat
@@ -4122,8 +4131,6 @@ export default function Home() {
                 )
               )}
             </div>
-
-
           </section>
 
           {/* COLUMN 2: MIDDLE PANE - ACTIVE DIRECT MESSAGE STREAM / GROUP CHAT */}

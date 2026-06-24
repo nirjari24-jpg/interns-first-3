@@ -65,8 +65,14 @@ body {
   50% { transform: translateY(20px) scale(0.95) rotate(180deg); }
 }
 
+@keyframes float-logo {
+  0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+  50% { transform: translate(-50%, calc(-50% - 4px)) rotate(1.5deg); }
+}
+
 .animate-float-slow { animation: float-slow 15s ease-in-out infinite; }
 .animate-float-medium { animation: float-medium 20s ease-in-out infinite; }
+.animate-float-logo { animation: float-logo 3s ease-in-out infinite; }
 
 /* Slide & Fade Animations */
 @keyframes slideUp {
