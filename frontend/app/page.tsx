@@ -3949,7 +3949,15 @@ export default function Home() {
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
               {navView === "calls" ? (
                 filteredContacts.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
+                  <div className="p-8 text-center flex flex-col items-center gap-3">
+                    <div className="text-slate-500 text-xs">No contacts found</div>
+                    <button
+                      onClick={() => fetchUsers(currentUser, false)}
+                      className="px-3 py-1.5 rounded-xl bg-[#2E2E33] hover:bg-[#3E3E44] text-xs font-semibold text-slate-300 border border-neutral-850 transition-all cursor-pointer active:scale-95"
+                    >
+                      Find / Sync Users
+                    </button>
+                  </div>
                 ) : (
                   filteredContacts.map((user) => {
                     const isOnline = onlineUsers[user.username] === "online";
@@ -4078,7 +4086,15 @@ export default function Home() {
                 </div>
               ) : (
                 filteredContacts.length === 0 ? (
-                  <div className="p-8 text-center text-slate-500 text-xs">No contacts found</div>
+                  <div className="p-8 text-center flex flex-col items-center gap-3">
+                    <div className="text-slate-500 text-xs">No contacts found</div>
+                    <button
+                      onClick={() => fetchUsers(currentUser, false)}
+                      className="px-3 py-1.5 rounded-xl bg-[#2E2E33] hover:bg-[#3E3E44] text-xs font-semibold text-slate-300 border border-neutral-850 transition-all cursor-pointer active:scale-95"
+                    >
+                      Find / Sync Users
+                    </button>
+                  </div>
                 ) : (
                   filteredContacts.map((user) => {
                     const isOnline = onlineUsers[user.username] === "online";
