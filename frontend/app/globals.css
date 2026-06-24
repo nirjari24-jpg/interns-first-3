@@ -42,43 +42,6 @@ body {
 /* ===== CHATME DARK THEME ===== */
 
 /* Glass card for auth */
-.glass-card-dark {
-  background: rgba(37, 37, 64, 0.75);
-  backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.glass-card-light {
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(24px) saturate(140%);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-}
-
-@keyframes slideDown {
-  from { transform: translateY(-50px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes chatBubbleIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.animate-slide-up { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-.animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
-.animate-chat-bubble { animation: chatBubbleIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.18); }
 
