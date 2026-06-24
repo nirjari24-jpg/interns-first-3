@@ -2786,6 +2786,52 @@ export default function Home() {
                       <Key className="w-4.5 h-4.5" /> Save New Password
                     </button>
                   </form>
+
+                  <div className="mt-8 pt-8 border-t border-[#2E2E33]">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Award className="w-5 h-5 text-[#E8EA7A]" />
+                      <h3 className="text-xs font-extrabold uppercase text-slate-350 tracking-wider">Security Health</h3>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
+                        <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
+                        <span className="text-base font-black">{securityScore}%</span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <h4 className="text-xs.5 font-bold tracking-wide">
+                          {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 leading-normal">
+                          {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
+                        <span className="text-[11px] font-bold">2-Factor Authentication</span>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTwoFactor(!twoFactor);
+                          setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
+                          setTimeout(() => setToast(null), 2500);
+                        }}
+                        className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
+                          twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
+                        }`}
+                      >
+                        <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
+                          twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
+                        }`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -3352,53 +3398,6 @@ export default function Home() {
                 </div>
               )}
 
-
-<<<<<<< HEAD
-=======
-                <div className="flex items-center gap-2 mb-4">
-                  <Award className="w-5 h-5 text-[#E8EA7A]" />
-                  <h3 className="text-xs font-extrabold uppercase text-slate-350 tracking-wider">Security Health</h3>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <div className="relative w-18 h-18 rounded-full border-4 border-[#2E2E33] flex items-center justify-center flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full border-4 border-[#E8EA7A] transition-all duration-500" style={{ clipPath: `polygon(0 0, 100% 0, 100% ${securityScore}%, 0 ${securityScore}%)` }} />
-                    <span className="text-base font-black">{securityScore}%</span>
-                  </div>
-
-                  <div className="space-y-1">
-                    <h4 className="text-xs.5 font-bold tracking-wide">
-                      {securityScore === 100 ? "Highly Shielded! 🔒" : "Enhancement Recommended"}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 leading-normal">
-                      {securityScore === 100 ? "Your account profile details are fully setup with robust configurations." : "Set a strong password and enable 2-Factor Authentication to reach 100% protection."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 pt-4 border-t border-[#2E2E33] flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-400" />
-                    <span className="text-[11px] font-bold">2-Factor Authentication</span>
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTwoFactor(!twoFactor);
-                      setToast(twoFactor ? "Two-Factor Auth Disabled 🔓" : "Two-Factor Auth Enabled 🔒");
-                      setTimeout(() => setToast(null), 2500);
-                    }}
-                    className={`w-10 h-5.5 rounded-full p-0.5 transition-colors duration-300 relative ${
-                      twoFactor ? "bg-[#E8EA7A]" : "bg-[#2E2E33]"
-                    }`}
-                  >
-                    <div className={`w-4.5 h-4.5 rounded-full bg-slate-950 transition-transform duration-300 ${
-                      twoFactor ? "translate-x-4.5 bg-white" : "translate-x-0"
-                    }`} />
-                  </button>
-                </div>
-              </div>
               {activeSection === "blocked" && (
                 <div className={`border rounded-[32px] p-6 md:p-8 shadow-2xl transition-all duration-500 relative overflow-hidden ${
                   isDark ? "bg-[#1A1A1E]/95 border-slate-800" : "bg-white border-slate-200 shadow-md"
@@ -3465,7 +3464,6 @@ export default function Home() {
                   </div>
                 </div>
               )}
->>>>>>> c65f010ba0b9df59c20f2a91dd40d8ca2d9da2b3
             </div>
           </div>
         </div>
