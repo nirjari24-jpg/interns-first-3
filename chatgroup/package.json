@@ -31,5 +31,9 @@
   },
   "allowScripts": {
     "sharp@0.34.5": true
+  },
+  "optionalDependencies": {
+    "lightningcss-linux-x64-gnu": "1.32.0",
+    "lightningcss-linux-x64-musl": "1.32.0"
   }
 }
