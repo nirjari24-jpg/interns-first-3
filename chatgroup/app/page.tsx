@@ -3950,11 +3950,14 @@ export default function Home() {
               {navView === "calls" ? (
                 filteredContacts.length === 0 ? (
                   <div className="p-8 text-center flex flex-col items-center gap-3">
-                    <div className="text-slate-500 text-xs">No contacts found</div>
+                    <div className="text-slate-500 text-xs mb-1">No contacts found</div>
                     <button
                       onClick={() => fetchUsers(currentUser, false)}
-                      className="px-3 py-1.5 rounded-xl bg-[#2E2E33] hover:bg-[#3E3E44] text-xs font-semibold text-slate-300 border border-neutral-850 transition-all cursor-pointer active:scale-95"
+                      className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#E8EA7A] to-[#D2D45E] hover:brightness-110 active:scale-95 text-[#1E1E22] text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-[#E8EA7A]/10"
                     >
+                      <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+                      </svg>
                       Find / Sync Users
                     </button>
                   </div>
@@ -4087,11 +4090,14 @@ export default function Home() {
               ) : (
                 filteredContacts.length === 0 ? (
                   <div className="p-8 text-center flex flex-col items-center gap-3">
-                    <div className="text-slate-500 text-xs">No contacts found</div>
+                    <div className="text-slate-500 text-xs mb-1">No contacts found</div>
                     <button
                       onClick={() => fetchUsers(currentUser, false)}
-                      className="px-3 py-1.5 rounded-xl bg-[#2E2E33] hover:bg-[#3E3E44] text-xs font-semibold text-slate-300 border border-neutral-850 transition-all cursor-pointer active:scale-95"
+                      className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#E8EA7A] to-[#D2D45E] hover:brightness-110 active:scale-95 text-[#1E1E22] text-xs font-extrabold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-[#E8EA7A]/10"
                     >
+                      <svg className="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.637 10.637z" />
+                      </svg>
                       Find / Sync Users
                     </button>
                   </div>
