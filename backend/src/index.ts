@@ -23,6 +23,13 @@ const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://nirjari24_db_user:
 app.use(cors());
 app.use(express.json());
 
+// Prevent caching for all API responses to avoid 304 Not Modified issues on stale/empty lists
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
+
 // Create HTTP server and initialize Socket.io
 const server = http.createServer(app);
 const io = new Server(server, {
