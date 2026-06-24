@@ -480,16 +480,23 @@ app.post('/api/users/login', async (req: Request, res: Response): Promise<any> =
 app.get('/api/users', async (req: Request, res: Response) => {
   try {
     const users = await User.find({ email: /@gmail\.com$/i });
-    // Exclude password hashes when listing users
-    const safeUsers = users.map(user => ({
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-      avatarUrl: user.avatarUrl,
-      category: user.category,
-      bio: user.bio,
-      statusText: user.statusText
-    }));
+    // Exclude password hashes and filter out AI/mock users when listing users
+    const safeUsers = users
+      .filter(user => {
+        const usernameLower = user.username.toLowerCase();
+        const emailLower = user.email.toLowerCase();
+        const forbidden = ['paul', 'ai', 'bot', 'assistant'];
+        return !forbidden.some(keyword => usernameLower.includes(keyword) || emailLower.includes(keyword));
+      })
+      .map(user => ({
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        category: user.category,
+        bio: user.bio,
+        statusText: user.statusText
+      }));
     res.json(safeUsers);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
