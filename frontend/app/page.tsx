@@ -134,7 +134,7 @@ export default function Home() {
 
   const API_BASE = customApiBase || process.env.NEXT_PUBLIC_API_URL || 
     (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
-      ? `${window.location.protocol}//${window.location.hostname}:5000`
+      ? "https://chatgroup-backend-production-8cf6.up.railway.app"
       : "http://localhost:5000");
 
   function fetchUsers(loggedInUser?: User | null, autoSelectOnDesktop = false) {
